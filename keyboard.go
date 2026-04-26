@@ -21,13 +21,18 @@ var (
 	dataPin = machine.D2
 )
 
-// readShiftRegister читает 8 бит данных из регистра сдвига 74HC165N.
+// readShiftRegister читает totalBits данных из цепочки 74HC165N.
 // 74HC165 сдвигает по фронту CLK (LOW→HIGH). После сдвига нужно дать время
 // выходу QH установиться (tpd ~20–30 ns), иначе читается старый/неверный бит.
-const shiftDelay = 1 * time.Microsecond 
+const shiftDelay = 1 * time.Microsecond
+const (
+	bitsPerBoard        = 8
+	shiftRegisterBoards = 5
+	totalBits           = bitsPerBoard * shiftRegisterBoards
+)
 
-func readShiftRegister() uint8 {
-	var data uint8 = 0
+func readShiftRegister() uint64 {
+	var data uint64 = 0
 
 	// Шаг 1: Загрузка параллельных данных (SH/LD = LOW)
 	shiftLoadPin.Low()
@@ -37,9 +42,9 @@ func readShiftRegister() uint8 {
 	shiftLoadPin.High()
 	time.Sleep(shiftDelay)
 
-	// Шаг 3: Читаем 8 бит. Порядок: прочитать QH → такт → (новый бит на QH).
-	// Первый бит уже на QH после load; остальные — после каждого сдвига.
-	for i := 0; i < 8; i++ {
+	// Шаг 3: Читаем totalBits бит. Порядок: прочитать QH → такт → (новый бит на QH).
+	// Первый бит уже на QH после load; складываем в data[0]..data[totalBits-1] по мере сдвига.
+	for i := 0; i < totalBits; i++ {
 		if i > 0 {
 			// Сдвиг: фронт LOW→HIGH. После сдвига на QH появляется следующий бит.
 			clockPin.High()
@@ -47,9 +52,9 @@ func readShiftRegister() uint8 {
 			clockPin.Low()
 			time.Sleep(shiftDelay)
 		}
-		// Читаем бит с QH
+		// Читаем бит с QH (первый сдвинутый бит — в младший бит data, дальше к старшим).
 		if dataPin.Get() {
-			data |= (1 << (7 - i))
+			data |= (1 << uint(i))
 		}
 	}
 
@@ -66,15 +71,15 @@ func RunKeyboard(ch chan<- Event) {
 	clockPin.Low()
 	dataPin.Configure(machine.PinConfig{Mode: machine.PinInput})
 
-	var prev uint8 = 0
+	var prev uint64 = 0
 	for {
 		data := readShiftRegister()
-		for i := uint8(0); i < 8; i++ {
-			mask := uint8(1 << i)
+		for i := 0; i < totalBits; i++ {
+			mask := uint64(1 << uint(i))
 			was := (prev & mask) != 0
 			now := (data & mask) != 0
 			if was != now {
-				if int(i) < len(BitToNote) {
+				if i < len(BitToNote) {
 					Velocity := uint8(0)
 					if now {
 						Velocity = DefaultVelocity
