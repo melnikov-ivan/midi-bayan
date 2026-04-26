@@ -19,7 +19,7 @@ async function connect(cbs) {
         }
 
         device = await navigator.bluetooth.requestDevice({
-            filters: [{ services: [0x1234] }],
+            filters: [{ services: ['03b80e5a-ede8-4b33-a751-6ce34ec4c700'] }],
             optionalServices: [SERVICE_UUID]
         });
 
