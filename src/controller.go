@@ -1,6 +1,6 @@
 package main
 
-// MIDI-команды отправляются через UART (DIN, 31250 бод). См. out.go.
+// MIDI-команды: UART (DIN), BLE MIDI, USB-MIDI. См. out.go.
 //
 //   tinygo flash -target=xiao-ble .
 //   tinygo monitor
@@ -55,6 +55,8 @@ func main() {
 	go StartBLEService()
 	go RunKeyboard(EventChannel)
 
+	// go demo()
+
 	// Ноты и параметры MIDI берутся из keymap; Program Change приходит из BLE (handleSetProgram).
 	for ev := range EventChannel {
 		switch ev.Type {
@@ -96,4 +98,18 @@ func blink() {
 	led.High()
 	time.Sleep(50 * time.Millisecond)
 	led.Low()
+}
+
+// demo периодически играет ноту C4: 100 мс звук, затем пауза 2 с до следующего срабатывания.
+// Запускается из main параллельно циклу событий, чтобы не блокировать приём с клавиатуры/BLE.
+func demo() {
+	const demoNote = 60 // C4
+	ch := uint8(DefaultChannel)
+	for {
+		SendNoteOn(ch, demoNote, DefaultVelocity)
+		time.Sleep(500 * time.Millisecond)
+		SendNoteOff(ch, demoNote)
+		println("demo: note", demoNote, "100ms, next in 2s")
+		time.Sleep(2 * time.Second)
+	}
 }
