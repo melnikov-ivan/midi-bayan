@@ -25,11 +25,20 @@
             <button id="connectBtn" class="btn-primary" onclick="connect()">Подключиться</button>
         </div>
 
-        <!-- Экран настроек: доступен после подключения -->
+        <!-- Экран меню: доступен после подключения -->
+        <div id="screenMenu" class="screen screen-hidden">
+            <h1>🎛️ Меню</h1>
+
+            <button class="btn-primary" onclick="showScreen('screenSettings')">⚙️ Настройки</button>
+            <button class="btn-primary" onclick="showScreen('screenAudio')">🔊 Аудио</button>
+            <button id="disconnectBtnMenu" class="btn-danger" onclick="disconnect()">Отключиться</button>
+        </div>
+
+        <!-- Экран настроек: доступен из меню -->
         <div id="screenSettings" class="screen screen-hidden">
             <h1>⚙️ Настройки</h1>
 
-            <button id="disconnectBtnSettings" class="btn-danger" onclick="disconnect()">Отключиться</button>
+            <button class="btn-secondary" onclick="showScreen('screenMenu')">← Назад</button>
 
             <div class="input-group">
                 <label>Канал:</label>
@@ -62,6 +71,13 @@
             </div>
 
             <button id="saveBtn" class="btn-primary" onclick="sendSetProgram()">Сохранить</button>
+        </div>
+
+        <!-- Экран аудио: доступен из меню -->
+        <div id="screenAudio" class="screen screen-hidden">
+            <h1>🔊 Аудио</h1>
+
+            <button class="btn-secondary" onclick="showScreen('screenMenu')">← Назад</button>
         </div>
     </div>
 
@@ -107,26 +123,20 @@
             sendSetProgram();
         }
 
-        function switchScreens(connected) {
-            const entrance = document.getElementById('screenEntrance');
-            const settings = document.getElementById('screenSettings');
-            if (connected) {
-                entrance.classList.add('screen-hidden');
-                settings.classList.remove('screen-hidden');
-            } else {
-                entrance.classList.remove('screen-hidden');
-                settings.classList.add('screen-hidden');
-            }
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(el => {
+                el.classList.toggle('screen-hidden', el.id !== id);
+            });
         }
 
         async function connect() {
             await BLE.connect({
                 onConnected: () => {
-                    switchScreens(true);
+                    showScreen('screenMenu');
                     readCharacteristic();
                 },
                 onDisconnected: () => {
-                    switchScreens(false);
+                    showScreen('screenEntrance');
                 },
                 onValue: processCharacteristicValue
             });
