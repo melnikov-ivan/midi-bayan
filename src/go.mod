@@ -1,4 +1,4 @@
-module blinky
+module bayan
 
 go 1.25.5
 

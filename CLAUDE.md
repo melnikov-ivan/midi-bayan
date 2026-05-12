@@ -8,17 +8,25 @@ TinyGo firmware for a MIDI Bayan (electronic accordion) controller running on a 
 
 ## Build & Flash Commands
 
+Module root is `src/` (`go.mod`, `Makefile`, and `README.md` live next to the firmware sources).
+
 ```sh
-# Flash firmware to device (must be in bootloader/UF2 mode)
+# From repository root — flash firmware (device in bootloader / UF2 mode)
+make -C src flash
+
+# Or from src/
+cd src
 make flash
-# or equivalently:
+# or:
 tinygo flash -target=xiao-ble .
 
-# Build UF2 without flashing
-tinygo build -target=xiao-ble -o firmware.uf2 .
+# Build UF2 without flashing (artifact at repository root)
+cd src && tinygo build -target=xiao-ble -o ../firmware.uf2 .
 
 # Monitor serial debug output
-make monitor
+make -C src monitor
+# or:
+cd src && make monitor
 # or:
 tinygo monitor
 ```
@@ -30,21 +38,21 @@ There are no tests or linters configured.
 The firmware uses a single event channel to decouple input from output:
 
 ```
-keyboard.go  →  chan Event  →  controller.go  →  out.go (UART + BLE MIDI)
-                                                ↕
-                              server.go (BLE GATT config service)
-                                                ↕
-                              api.go / config.go (protocol + state)
+src/keyboard.go  →  chan Event  →  src/controller.go  →  src/out.go (UART + BLE MIDI)
+                                                        ↕
+                                      src/server.go (BLE GATT config service)
+                                                        ↕
+                                      src/api.go / src/config.go (protocol + state)
 ```
 
-**Key files:**
-- `controller.go` — `main()`: initializes hardware, starts `StartBLEService()` and `RunKeyboard()` goroutines, then loops on the event channel dispatching MIDI output
-- `keyboard.go` — polls 5×74HC165 shift registers via SPI-like bit-bang (SH/LD=D0, CLK=D1, QH=D2), detects bit changes, emits `NoteOn` events
-- `keymap.go` — `BitToNote[40]` mapping (C4–D#7), default channel/velocity
-- `out.go` — sends NoteOn/Off/ProgramChange/Volume via UART (31250 baud) and BLE MIDI (Apple BLE MIDI service, 13-bit timestamp header)
-- `server.go` — registers two BLE GATT services: standard MIDI service (UUID `03B8…`) and custom config service (UUID `12345678-…`); config characteristic write handler feeds `api.go`
-- `api.go` — binary config protocol: `[cmd(1) | len_lo(1) | len_hi(1) | payload(N) | crc8(1)]`; commands `0x01` get_program, `0x02` set_program; CRC-8 poly `0x07`
-- `config.go` — `ChannelConfig` stores instrument, volume, octave for each of 16 MIDI channels
+**Key files (under `src/`):**
+- `src/controller.go` — `main()`: initializes hardware, starts `StartBLEService()` and `RunKeyboard()` goroutines, then loops on the event channel dispatching MIDI output
+- `src/keyboard.go` — polls 5×74HC165 shift registers via SPI-like bit-bang (SH/LD=D0, CLK=D1, QH=D2), detects bit changes, emits `NoteOn` events
+- `src/keymap.go` — `BitToNote[40]` mapping (C4–D#7), default channel/velocity
+- `src/out.go` — sends NoteOn/Off/ProgramChange/Volume via UART (31250 baud) and BLE MIDI (Apple BLE MIDI service, 13-bit timestamp header)
+- `src/server.go` — registers two BLE GATT services: standard MIDI service (UUID `03B8…`) and custom config service (UUID `12345678-…`); config characteristic write handler feeds `api.go`
+- `src/api.go` — binary config protocol: `[cmd(1) | len_lo(1) | len_hi(1) | payload(N) | crc8(1)]`; commands `0x01` get_program, `0x02` set_program; CRC-8 poly `0x07`
+- `src/config.go` — `ChannelConfig` stores instrument, volume, octave for each of 16 MIDI channels
 
 **PWA (`pwa/`):**
 - `ble.js` — Web Bluetooth wrapper (connect/disconnect/read/write)

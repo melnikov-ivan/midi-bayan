@@ -1,7 +1,6 @@
 package main
 
-// tinygo flash -target=waveshare-rp2040-zero
-// tinygo flash -target=xiao-ble keyboard.go
+// tinygo flash -target=xiao-ble .
 // tinygo monitor
 import (
 	"machine"
