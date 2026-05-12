@@ -16,10 +16,13 @@ const (
 	NoteOn        KeyEventType = iota // событие клавиши (Channel, Note, Velocity: 100=нажато, 0=отпущено)
 	ProgramChange                     // смена инструмента (Channel, Program)
 	Volume                            // громкость канала (Channel, Volume)
+	Reverb                            // глубина реверберации канала (Channel, CCValue)
+	Chorus                            // глубина хоруса канала (Channel, CCValue)
+	Delay                             // глубина дилея канала (Channel, CCValue)
 )
 
 type Event struct {
-	Type KeyEventType // NoteOn, ProgramChange или Volume
+	Type KeyEventType // NoteOn, ProgramChange, Volume, Reverb, Chorus, Delay
 
 	// NoteOn: клавиатура заполняет из keymap (Velocity: 100=нажато, 0=отпущено)
 	Channel  uint8
@@ -31,6 +34,9 @@ type Event struct {
 
 	// Volume (CC #7)
 	Volume uint8
+
+	// Reverb (CC #91), Chorus (CC #93), Delay (CC #94) — общее поле значения
+	CCValue uint8
 }
 
 var led = machine.LED
@@ -59,6 +65,18 @@ func main() {
 		case Volume:
 			SendVolume(ev.Channel, ev.Volume)
 			println("MIDI: Volume ch=", ev.Channel, "volume=", ev.Volume)
+			blink()
+		case Reverb:
+			SendReverb(ev.Channel, ev.CCValue)
+			println("MIDI: Reverb ch=", ev.Channel, "value=", ev.CCValue)
+			blink()
+		case Chorus:
+			SendChorus(ev.Channel, ev.CCValue)
+			println("MIDI: Chorus ch=", ev.Channel, "value=", ev.CCValue)
+			blink()
+		case Delay:
+			SendDelay(ev.Channel, ev.CCValue)
+			println("MIDI: Delay ch=", ev.Channel, "value=", ev.CCValue)
 			blink()
 		case NoteOn:
 			SendNoteOn(ev.Channel, ev.Note, ev.Velocity)

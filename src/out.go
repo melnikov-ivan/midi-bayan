@@ -80,8 +80,28 @@ func SendProgramChange(channel uint8, program uint8) {
 
 // SendVolume отправляет MIDI Control Change #7 (Channel Volume) по UART и BLE MIDI (0xB0 | channel, 0x07, value).
 func SendVolume(channel uint8, volume uint8) {
+	sendCC(channel, 0x07, volume)
+}
+
+// SendReverb отправляет MIDI Control Change #91 (Effects 1 Depth — Reverb Send).
+func SendReverb(channel uint8, value uint8) {
+	sendCC(channel, 91, value)
+}
+
+// SendChorus отправляет MIDI Control Change #93 (Effects 3 Depth — Chorus Send).
+func SendChorus(channel uint8, value uint8) {
+	sendCC(channel, 93, value)
+}
+
+// SendDelay отправляет MIDI Control Change #94 (Effects 4 Depth — используется как Delay).
+func SendDelay(channel uint8, value uint8) {
+	sendCC(channel, 94, value)
+}
+
+// sendCC формирует и отправляет MIDI Control Change по UART и BLE MIDI.
+func sendCC(channel, controller, value uint8) {
 	ch := channel & 0x0F
-	msg := []byte{0xB0 | ch, 0x07, volume & 0x7F}
+	msg := []byte{0xB0 | ch, controller & 0x7F, value & 0x7F}
 	machine.UART0.Write(msg)
 	sendMidiBLE(msg)
 }

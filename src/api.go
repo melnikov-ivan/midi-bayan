@@ -3,7 +3,12 @@ package main
 const (
 	cmdGetProgram byte = 0x01
 	cmdSetProgram byte = 0x02
+	cmdSetAudio   byte = 0x03
 )
+
+// audioBroadcastChannels — каналы, на которые транслируются общие аудио-настройки.
+// 0 — Melody, 1 — Chord, 2 — Bass (см. pwa/index.html).
+var audioBroadcastChannels = [...]byte{0, 1, 2}
 
 const minMessageLen = 4 // cmd(1) + len(2) + crc(1), payload может быть 0
 
@@ -80,6 +85,30 @@ func handleSetProgram(payload []byte) bool {
 			Type:    Volume,
 			Channel: channel,
 			Volume:  volume,
+		}
+	}
+	return true
+}
+
+// handleSetAudio обрабатывает команду set_audio: payload = [volume, reverb, chorus, delay].
+// Сохраняет общие аудио-настройки и рассылает соответствующие MIDI CC через EventChannel
+// на все используемые каналы (audioBroadcastChannels).
+func handleSetAudio(payload []byte) bool {
+	if len(payload) != 4 {
+		return false
+	}
+	volume := payload[0]
+	reverb := payload[1]
+	chorus := payload[2]
+	delay := payload[3]
+	SetAudioConfig(volume, reverb, chorus, delay)
+	println("set_audio: volume=", volume, "reverb=", reverb, "chorus=", chorus, "delay=", delay)
+	if EventChannel != nil {
+		for _, ch := range audioBroadcastChannels {
+			EventChannel <- Event{Type: Volume, Channel: ch, Volume: volume}
+			EventChannel <- Event{Type: Reverb, Channel: ch, CCValue: reverb}
+			EventChannel <- Event{Type: Chorus, Channel: ch, CCValue: chorus}
+			EventChannel <- Event{Type: Delay, Channel: ch, CCValue: delay}
 		}
 	}
 	return true
