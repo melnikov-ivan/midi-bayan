@@ -152,6 +152,9 @@
             document.querySelectorAll('.screen').forEach(el => {
                 el.classList.toggle('screen-hidden', el.id !== id);
             });
+            if (id === 'screenAudio') {
+                sendGetAudio();
+            }
         }
 
         async function connect() {
@@ -182,14 +185,39 @@
             document.getElementById('octaveValueDisplay').textContent = octaveClamped;
         }
 
+        function fillAudioFields(volume, reverb, chorus, delay) {
+            const setSlider = (id, displayId, value) => {
+                const v = Math.max(0, Math.min(127, Number(value) & 0x7f));
+                document.getElementById(id).value = v;
+                document.getElementById(displayId).textContent = v;
+            };
+            setSlider('audioVolume', 'audioVolumeDisplay', volume);
+            setSlider('audioReverb', 'audioReverbDisplay', reverb);
+            setSlider('audioChorus', 'audioChorusDisplay', chorus);
+            setSlider('audioDelay', 'audioDelayDisplay', delay);
+        }
+
         function processCharacteristicValue(value) {
             const buf = value.buffer || value;
             const bytes = new Uint8Array(buf, value.byteOffset || 0, value.byteLength || buf.byteLength);
             const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
-            console.log('Значение характеристики:', hex, '| байты:', bytes[0], bytes[1], bytes[2], bytes[3]);
-            if (bytes.length >= 4) {
-                console.log('  канал:', bytes[0], 'инструмент:', bytes[1], 'громкость:', bytes[2], 'октава:', bytes[3]);
-                fillProgramFields(bytes[1], bytes[2], bytes[3]);
+            console.log('Значение характеристики:', hex);
+            if (bytes.length === 0) return;
+            switch (bytes[0]) {
+                case CMD_GET_PROGRAM:
+                    if (bytes.length >= 5) {
+                        console.log('  get_program: канал:', bytes[1], 'инструмент:', bytes[2], 'громкость:', bytes[3], 'октава:', bytes[4]);
+                        fillProgramFields(bytes[2], bytes[3], bytes[4]);
+                    }
+                    break;
+                case CMD_GET_AUDIO:
+                    if (bytes.length >= 5) {
+                        console.log('  get_audio: громкость:', bytes[1], 'реверб:', bytes[2], 'хорус:', bytes[3], 'дилей:', bytes[4]);
+                        fillAudioFields(bytes[1], bytes[2], bytes[3], bytes[4]);
+                    }
+                    break;
+                default:
+                    console.log('  неизвестный ответ, cmd=', bytes[0]);
             }
         }
 
@@ -218,6 +246,16 @@
                 console.log('Отправлено get_program, channel:', channel);
             } catch (error) {
                 console.error('Ошибка отправки get_program:', error);
+            }
+        }
+
+        async function sendGetAudio() {
+            try {
+                const msg = buildGetAudioMessage();
+                await BLE.writeValue(msg);
+                console.log('Отправлено get_audio');
+            } catch (error) {
+                console.error('Ошибка отправки get_audio:', error);
             }
         }
 

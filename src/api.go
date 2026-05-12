@@ -4,6 +4,7 @@ const (
 	cmdGetProgram byte = 0x01
 	cmdSetProgram byte = 0x02
 	cmdSetAudio   byte = 0x03
+	cmdGetAudio   byte = 0x04
 )
 
 // audioBroadcastChannels — каналы, на которые транслируются общие аудио-настройки.
@@ -88,6 +89,17 @@ func handleSetProgram(payload []byte) bool {
 		}
 	}
 	return true
+}
+
+// handleGetAudio обрабатывает команду get_audio: payload пуст.
+// Возвращает текущие общие аудио-настройки (volume, reverb, chorus, delay).
+func handleGetAudio(payload []byte) (volume, reverb, chorus, delay byte, ok bool) {
+	if len(payload) != 0 {
+		return 0, 0, 0, 0, false
+	}
+	a := AudioConfig
+	println("get_audio: volume=", a.Volume, "reverb=", a.Reverb, "chorus=", a.Chorus, "delay=", a.Delay)
+	return a.Volume, a.Reverb, a.Chorus, a.Delay, true
 }
 
 // handleSetAudio обрабатывает команду set_audio: payload = [volume, reverb, chorus, delay].
