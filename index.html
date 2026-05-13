@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Midi-Bayan">
+    <title>Midi-Bayan Control</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <script src="api.js"></script>
+    <script src="ble.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Экран входа: подключение к midi-сервису -->
+        <div id="screenEntrance" class="screen">
+            <h1>🔵 Midi-Bayan</h1>
+
+            <img src="bayan.jpg" alt="Баян" class="bayan-image" />
+
+            <button id="connectBtn" class="btn-primary" onclick="connect()">Подключиться</button>
+        </div>
+
+        <!-- Экран меню: доступен после подключения -->
+        <div id="screenMenu" class="screen screen-hidden">
+            <h1>🎛️ Меню</h1>
+
+            <button class="btn-primary" onclick="showScreen('screenSettings')">⚙️ Настройки</button>
+            <button class="btn-primary" onclick="showScreen('screenAudio')">🔊 Аудио</button>
+            <button id="disconnectBtnMenu" class="btn-danger" onclick="disconnect()">Отключиться</button>
+        </div>
+
+        <!-- Экран настроек: доступен из меню -->
+        <div id="screenSettings" class="screen screen-hidden">
+            <h1>⚙️ Настройки</h1>
+
+            <button class="btn-secondary" onclick="showScreen('screenMenu')">← Назад</button>
+
+            <div class="input-group">
+                <label>Канал:</label>
+                <div class="channel-buttons">
+                    <button type="button" class="btn-channel active" data-channel="0" onclick="selectChannelAndGetProgram(0)">Мелодия</button>
+                    <button type="button" class="btn-channel" data-channel="1" onclick="selectChannelAndGetProgram(1)">Аккорд</button>
+                    <button type="button" class="btn-channel" data-channel="2" onclick="selectChannelAndGetProgram(2)">Бас</button>
+                </div>
+                <input type="hidden" id="channelValue" value="0" />
+            </div>
+
+            <div class="row-fields">
+                <div class="input-group">
+                    <label>Инструмент</label>
+                    <select id="instrumentValue" onchange="sendSetProgram()"></select>
+                </div>
+                <div class="input-group">
+                    <label>Громкость <span id="volumeValueDisplay">100</span></label>
+                    <input type="range" id="volumeValue" min="0" max="127" value="100" oninput="document.getElementById('volumeValueDisplay').textContent=this.value" onchange="sendSetProgram()" />
+                </div>
+                <div class="input-group">
+                    <label>Октава</label>
+                    <div class="octave-control">
+                        <button type="button" class="btn-octave" onclick="changeOctave(-1)" aria-label="Октава минус">−</button>
+                        <span id="octaveValueDisplay">0</span>
+                        <button type="button" class="btn-octave" onclick="changeOctave(1)" aria-label="Октава плюс">+</button>
+                    </div>
+                    <input type="hidden" id="octaveValue" value="0" />
+                </div>
+            </div>
+
+            <button id="saveBtn" class="btn-primary" onclick="sendSetProgram()">Сохранить</button>
+        </div>
+
+        <!-- Экран аудио: доступен из меню -->
+        <div id="screenAudio" class="screen screen-hidden">
+            <h1>🔊 Аудио</h1>
+
+            <button class="btn-secondary" onclick="showScreen('screenMenu')">← Назад</button>
+
+            <div class="input-group">
+                <label>Громкость <span id="audioVolumeDisplay">100</span></label>
+                <input type="range" id="audioVolume" min="0" max="127" value="100"
+                    oninput="document.getElementById('audioVolumeDisplay').textContent=this.value"
+                    onchange="sendSetAudio()" />
+            </div>
+            <div class="input-group">
+                <label>Реверб <span id="audioReverbDisplay">0</span></label>
+                <input type="range" id="audioReverb" min="0" max="127" value="0"
+                    oninput="document.getElementById('audioReverbDisplay').textContent=this.value"
+                    onchange="sendSetAudio()" />
+            </div>
+            <div class="input-group">
+                <label>Хорус <span id="audioChorusDisplay">0</span></label>
+                <input type="range" id="audioChorus" min="0" max="127" value="0"
+                    oninput="document.getElementById('audioChorusDisplay').textContent=this.value"
+                    onchange="sendSetAudio()" />
+            </div>
+            <div class="input-group">
+                <label>Дилей <span id="audioDelayDisplay">0</span></label>
+                <input type="range" id="audioDelay" min="0" max="127" value="0"
+                    oninput="document.getElementById('audioDelayDisplay').textContent=this.value"
+                    onchange="sendSetAudio()" />
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // General MIDI Program names (0–127)
+        const GM_INSTRUMENTS = [
+            'Acoustic Grand Piano', 'Bright Acoustic Piano', 'Electric Grand Piano', 'Honky-tonk Piano',
+            'Electric Piano 1', 'Electric Piano 2', 'Harpsichord', 'Clavinet',
+            'Celesta', 'Glockenspiel', 'Music Box', 'Vibraphone', 'Marimba', 'Xylophone', 'Tubular Bells', 'Dulcimer',
+            'Drawbar Organ', 'Percussive Organ', 'Rock Organ', 'Church Organ', 'Reed Organ', 'Accordion', 'Harmonica', 'Tango Accordion',
+            'Acoustic Guitar (nylon)', 'Acoustic Guitar (steel)', 'Electric Guitar (jazz)', 'Electric Guitar (clean)',
+            'Electric Guitar (muted)', 'Overdriven Guitar', 'Distortion Guitar', 'Guitar Harmonics',
+            'Acoustic Bass', 'Electric Bass (finger)', 'Electric Bass (pick)', 'Fretless Bass', 'Slap Bass 1', 'Slap Bass 2', 'Synth Bass 1', 'Synth Bass 2',
+            'Violin', 'Viola', 'Cello', 'Contrabass', 'Tremolo Strings', 'Pizzicato Strings', 'Orchestral Harp', 'Timpani',
+            'String Ensemble 1', 'String Ensemble 2', 'Synth Strings 1', 'Synth Strings 2', 'Choir Aahs', 'Voice Oohs', 'Synth Choir', 'Orchestra Hit',
+            'Trumpet', 'Trombone', 'Tuba', 'Muted Trumpet', 'French Horn', 'Brass Section', 'Synth Brass 1', 'Synth Brass 2',
+            'Soprano Sax', 'Alto Sax', 'Tenor Sax', 'Baritone Sax', 'Oboe', 'English Horn', 'Bassoon', 'Clarinet',
+            'Piccolo', 'Flute', 'Recorder', 'Pan Flute', 'Blown Bottle', 'Shakuhachi', 'Whistle', 'Ocarina',
+            'Lead 1 (square)', 'Lead 2 (sawtooth)', 'Lead 3 (calliope)', 'Lead 4 (chiff)', 'Lead 5 (charang)', 'Lead 6 (voice)', 'Lead 7 (fifths)', 'Lead 8 (bass + lead)',
+            'Pad 1 (new age)', 'Pad 2 (warm)', 'Pad 3 (polysynth)', 'Pad 4 (choir)', 'Pad 5 (bowed)', 'Pad 6 (metallic)', 'Pad 7 (halo)', 'Pad 8 (sweep)',
+            'FX 1 (rain)', 'FX 2 (soundtrack)', 'FX 3 (crystal)', 'FX 4 (atmosphere)', 'FX 5 (brightness)', 'FX 6 (goblins)', 'FX 7 (echoes)', 'FX 8 (sci-fi)',
+            'Sitar', 'Banjo', 'Shamisen', 'Koto', 'Kalimba', 'Bag pipe', 'Fiddle', 'Shanai',
+            'Tinkle Bell', 'Agogo', 'Steel Drums', 'Woodblock', 'Taiko Drum', 'Melodic Tom', 'Synth Drum', 'Reverse Cymbal',
+            'Guitar Fret Noise', 'Breath Noise', 'Seashore', 'Bird Tweet', 'Telephone Ring', 'Helicopter', 'Applause', 'Gunshot'
+        ];
+
+        function initInstrumentSelect() {
+            const sel = document.getElementById('instrumentValue');
+            GM_INSTRUMENTS.forEach((name, i) => {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = i + '. ' + name;
+                sel.appendChild(opt);
+            });
+        }
+
+        function changeOctave(delta) {
+            const el = document.getElementById('octaveValue');
+            let v = parseInt(el.value, 10) + delta;
+            v = Math.max(-3, Math.min(3, v));
+            el.value = v;
+            document.getElementById('octaveValueDisplay').textContent = v;
+            sendSetProgram();
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(el => {
+                el.classList.toggle('screen-hidden', el.id !== id);
+            });
+            if (id === 'screenAudio') {
+                sendGetAudio();
+            }
+        }
+
+        async function connect() {
+            await BLE.connect({
+                onConnected: () => {
+                    showScreen('screenMenu');
+                    readCharacteristic();
+                },
+                onDisconnected: () => {
+                    showScreen('screenEntrance');
+                },
+                onValue: processCharacteristicValue
+            });
+        }
+
+        function disconnect() {
+            BLE.disconnect();
+        }
+
+        function fillProgramFields(instrument, volume, octave) {
+            const instEl = document.getElementById('instrumentValue');
+            instEl.value = String(Number(instrument) & 0x7f);
+            const volEl = document.getElementById('volumeValue');
+            volEl.value = volume;
+            document.getElementById('volumeValueDisplay').textContent = volume;
+            const octaveClamped = Math.max(-3, Math.min(3, Number(octave)));
+            document.getElementById('octaveValue').value = octaveClamped;
+            document.getElementById('octaveValueDisplay').textContent = octaveClamped;
+        }
+
+        function fillAudioFields(volume, reverb, chorus, delay) {
+            const setSlider = (id, displayId, value) => {
+                const v = Math.max(0, Math.min(127, Number(value) & 0x7f));
+                document.getElementById(id).value = v;
+                document.getElementById(displayId).textContent = v;
+            };
+            setSlider('audioVolume', 'audioVolumeDisplay', volume);
+            setSlider('audioReverb', 'audioReverbDisplay', reverb);
+            setSlider('audioChorus', 'audioChorusDisplay', chorus);
+            setSlider('audioDelay', 'audioDelayDisplay', delay);
+        }
+
+        function processCharacteristicValue(value) {
+            const buf = value.buffer || value;
+            const bytes = new Uint8Array(buf, value.byteOffset || 0, value.byteLength || buf.byteLength);
+            const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            console.log('Значение характеристики:', hex);
+            if (bytes.length === 0) return;
+            switch (bytes[0]) {
+                case CMD_GET_PROGRAM:
+                    if (bytes.length >= 5) {
+                        console.log('  get_program: канал:', bytes[1], 'инструмент:', bytes[2], 'громкость:', bytes[3], 'октава:', bytes[4]);
+                        fillProgramFields(bytes[2], bytes[3], bytes[4]);
+                    }
+                    break;
+                case CMD_GET_AUDIO:
+                    if (bytes.length >= 5) {
+                        console.log('  get_audio: громкость:', bytes[1], 'реверб:', bytes[2], 'хорус:', bytes[3], 'дилей:', bytes[4]);
+                        fillAudioFields(bytes[1], bytes[2], bytes[3], bytes[4]);
+                    }
+                    break;
+                default:
+                    console.log('  неизвестный ответ, cmd=', bytes[0]);
+            }
+        }
+
+        async function readCharacteristic() {
+            try {
+                const bytes = await BLE.readValue();
+                processCharacteristicValue(bytes);
+            } catch (error) {
+                console.error('Ошибка чтения:', error);
+            }
+        }
+
+        function selectChannelAndGetProgram(channel) {
+            document.getElementById('channelValue').value = channel;
+            document.querySelectorAll('.btn-channel').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.channel, 10) === channel);
+            });
+            sendGetProgram();
+        }
+
+        async function sendGetProgram() {
+            try {
+                const channel = parseInt(document.getElementById('channelValue').value, 10) & 0xff;
+                const msg = buildGetProgramMessage(channel);
+                await BLE.writeValue(msg);
+                console.log('Отправлено get_program, channel:', channel);
+            } catch (error) {
+                console.error('Ошибка отправки get_program:', error);
+            }
+        }
+
+        async function sendGetAudio() {
+            try {
+                const msg = buildGetAudioMessage();
+                await BLE.writeValue(msg);
+                console.log('Отправлено get_audio');
+            } catch (error) {
+                console.error('Ошибка отправки get_audio:', error);
+            }
+        }
+
+        async function sendSetAudio() {
+            try {
+                const volume = parseInt(document.getElementById('audioVolume').value, 10);
+                const reverb = parseInt(document.getElementById('audioReverb').value, 10);
+                const chorus = parseInt(document.getElementById('audioChorus').value, 10);
+                const delay = parseInt(document.getElementById('audioDelay').value, 10);
+                const inRange = (v) => !isNaN(v) && v >= 0 && v <= 127;
+                if (!inRange(volume) || !inRange(reverb) || !inRange(chorus) || !inRange(delay)) {
+                    console.log('Ошибка валидации set_audio:', volume, reverb, chorus, delay);
+                    return;
+                }
+                const msg = buildSetAudioMessage(volume, reverb, chorus, delay);
+                await BLE.writeValue(msg);
+                console.log('Отправлено set_audio:', volume, reverb, chorus, delay);
+            } catch (error) {
+                console.log('Ошибка отправки set_audio:', error);
+            }
+        }
+
+        async function sendSetProgram() {
+            try {
+                const channel = parseInt(document.getElementById('channelValue').value, 10);
+                const instrument = parseInt(document.getElementById('instrumentValue').value, 10);
+                const volume = parseInt(document.getElementById('volumeValue').value, 10);
+                const octave = parseInt(document.getElementById('octaveValue').value, 10);
+                if (isNaN(channel) || channel < 0 || channel > 15) {
+                    console.log('Ошибка валидации: канал должен быть от 0 до 15', channel);
+                    return;
+                }
+                if (isNaN(instrument) || instrument < 0 || instrument > 127) {
+                    console.log('Ошибка валидации: инструмент должен быть от 0 до 127', instrument);
+                    return;
+                }
+                if (isNaN(volume) || volume < 0 || volume > 127) {
+                    console.log('Ошибка валидации: громкость должна быть от 0 до 127', volume);
+                    return;
+                }
+                if (isNaN(octave) || octave < -3 || octave > 3) {
+                    console.log('Ошибка валидации: октава должна быть от -3 до 3', octave);
+                    return;
+                }
+                const msg = buildSetProgramMessage(channel & 0xff, instrument & 0xff, volume & 0xff, octave & 0xff);
+                await BLE.writeValue(msg);
+                console.log('Отправлено set_program:', channel, instrument, volume, octave);
+            } catch (error) {
+                console.log('Ошибка отправки set_program:', error);
+            }
+        }
+
+        initInstrumentSelect();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>
