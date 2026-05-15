@@ -113,6 +113,8 @@
             <button class="btn-secondary" onclick="showScreen('screenMenu')">← Назад</button>
 
             <button class="btn-primary" onclick="sendStylePlay()">▶ Пуск</button>
+            <button class="btn-primary" onclick="sendGetTempo()">🎵 Темп</button>
+            <p class="style-tempo-line">Темп: <span id="styleTempoBpm">—</span> BPM</p>
         </div>
     </div>
 
@@ -229,6 +231,14 @@
                 case CMD_STYLE:
                     console.log('  style (ответ устройства)');
                     break;
+                case CMD_TEMPO:
+                    if (bytes.length >= 3) {
+                        const bpm = bytes[1] | (bytes[2] << 8);
+                        console.log('  tempo: bpm=', bpm);
+                        const el = document.getElementById('styleTempoBpm');
+                        if (el) el.textContent = String(bpm);
+                    }
+                    break;
                 default:
                     console.log('  неизвестный ответ, cmd=', bytes[0]);
             }
@@ -279,6 +289,16 @@
                 console.log('Отправлено CMD_STYLE (пуск)');
             } catch (error) {
                 console.error('Ошибка отправки style:', error);
+            }
+        }
+
+        async function sendGetTempo() {
+            try {
+                const msg = buildGetTempoMessage();
+                await BLE.writeValue(msg);
+                console.log('Отправлено CMD_TEMPO');
+            } catch (error) {
+                console.error('Ошибка отправки tempo:', error);
             }
         }
 

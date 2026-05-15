@@ -1,12 +1,23 @@
 package main
 
+import (
+	"time"
+)
+
 const (
 	cmdGetProgram byte = 0x01
 	cmdSetProgram byte = 0x02
 	cmdSetAudio   byte = 0x03
 	cmdGetAudio   byte = 0x04
 	cmdStyle      byte = 0x05 // стиль / пуск (PWA: экран «Стиль»)
+	cmdTempo      byte = 0x06 // тап по «Темп» в PWA + ответ BPM по BLE
 )
+
+// Интервал между последними двумя нажатиями «Темп» (CMD_TEMPO), мс; 0 — ещё не было пары валидных тапов.
+var tempoBeatIntervalMs int64
+
+// Время последнего CMD_TEMPO (Unix мс).
+var tempoLastTapMs int64
 
 // audioBroadcastChannels — каналы, на которые транслируются общие аудио-настройки.
 // 0 — Melody, 1 — Chord, 2 — Bass (см. pwa/index.html).
@@ -134,4 +145,33 @@ func handleStyle(payload []byte) bool {
 	}
 	println("style_play")
 	return true
+}
+
+// handleTempo: каждое нажатие «Темп» в PWA — тап; BPM по интервалу между двумя последними тапами.
+func handleTempo(payload []byte) (bpm uint16, ok bool) {
+	if len(payload) != 0 {
+		return 0, false
+	}
+	now := time.Now().UnixMilli()
+	if tempoLastTapMs > 0 {
+		d := now - tempoLastTapMs
+		// ~20–300 BPM
+		if d >= 180 && d <= 3000 {
+			tempoBeatIntervalMs = d
+		}
+	}
+	tempoLastTapMs = now
+
+	if tempoBeatIntervalMs <= 0 {
+		return 120, true
+	}
+	x := (60000 + tempoBeatIntervalMs/2) / tempoBeatIntervalMs
+	if x < 20 {
+		x = 20
+	}
+	if x > 320 {
+		x = 320
+	}
+	println("tempo: bpm=", x, "interval_ms=", tempoBeatIntervalMs)
+	return uint16(x), true
 }

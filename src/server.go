@@ -110,7 +110,7 @@ func StartBLEService() {
 
 	// Бесконечный цикл: парсим входящие сообщения и синхронизируем только при новом значении
 	for {
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(10 * time.Millisecond)
 		if hasNewValue && charValueLen > 0 {
 			hasNewValue = false
 			msg := charValueBuf[:charValueLen]
@@ -144,6 +144,15 @@ func StartBLEService() {
 				handleSetAudio(payload)
 			case cmdStyle:
 				handleStyle(payload)
+			case cmdTempo:
+				if bpm, ok := handleTempo(payload); ok {
+					charValueBuf[0] = cmdTempo
+					charValueBuf[1] = byte(bpm)
+					charValueBuf[2] = byte(bpm >> 8)
+					charValueBuf[3] = 0
+					charValueBuf[4] = 0
+					configChar.Write(charValueBuf[:5])
+				}
 			default:
 				println("unknown command:", cmd)
 			}
