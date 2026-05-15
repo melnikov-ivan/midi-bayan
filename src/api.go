@@ -5,6 +5,7 @@ const (
 	cmdSetProgram byte = 0x02
 	cmdSetAudio   byte = 0x03
 	cmdGetAudio   byte = 0x04
+	cmdStyle      byte = 0x05 // стиль / пуск (PWA: экран «Стиль»)
 )
 
 // audioBroadcastChannels — каналы, на которые транслируются общие аудио-настройки.
@@ -123,5 +124,14 @@ func handleSetAudio(payload []byte) bool {
 			EventChannel <- Event{Type: Delay, Channel: ch, CCValue: delay}
 		}
 	}
+	return true
+}
+
+// handleStyle обрабатывает команду style: payload пуст (запуск стиля с PWA).
+func handleStyle(payload []byte) bool {
+	if len(payload) != 0 {
+		return false
+	}
+	println("style_play")
 	return true
 }

@@ -31,6 +31,7 @@
 
             <button class="btn-primary" onclick="showScreen('screenSettings')">⚙️ Настройки</button>
             <button class="btn-primary" onclick="showScreen('screenAudio')">🔊 Аудио</button>
+            <button class="btn-primary" onclick="showScreen('screenStyle')">🎹 Стиль</button>
             <button id="disconnectBtnMenu" class="btn-danger" onclick="disconnect()">Отключиться</button>
         </div>
 
@@ -103,6 +104,15 @@
                     oninput="document.getElementById('audioDelayDisplay').textContent=this.value"
                     onchange="sendSetAudio()" />
             </div>
+        </div>
+
+        <!-- Экран стиля: команда CMD_STYLE (пуск) -->
+        <div id="screenStyle" class="screen screen-hidden">
+            <h1>🎹 Стиль</h1>
+
+            <button class="btn-secondary" onclick="showScreen('screenMenu')">← Назад</button>
+
+            <button class="btn-primary" onclick="sendStylePlay()">▶ Пуск</button>
         </div>
     </div>
 
@@ -216,6 +226,9 @@
                         fillAudioFields(bytes[1], bytes[2], bytes[3], bytes[4]);
                     }
                     break;
+                case CMD_STYLE:
+                    console.log('  style (ответ устройства)');
+                    break;
                 default:
                     console.log('  неизвестный ответ, cmd=', bytes[0]);
             }
@@ -256,6 +269,16 @@
                 console.log('Отправлено get_audio');
             } catch (error) {
                 console.error('Ошибка отправки get_audio:', error);
+            }
+        }
+
+        async function sendStylePlay() {
+            try {
+                const msg = buildStylePlayMessage();
+                await BLE.writeValue(msg);
+                console.log('Отправлено CMD_STYLE (пуск)');
+            } catch (error) {
+                console.error('Ошибка отправки style:', error);
             }
         }
 

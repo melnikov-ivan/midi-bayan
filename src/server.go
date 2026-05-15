@@ -142,6 +142,8 @@ func StartBLEService() {
 				}
 			case cmdSetAudio:
 				handleSetAudio(payload)
+			case cmdStyle:
+				handleStyle(payload)
 			default:
 				println("unknown command:", cmd)
 			}
