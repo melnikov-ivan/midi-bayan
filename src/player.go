@@ -73,13 +73,22 @@ func TempoBeatIntervalMs() int64 {
 	return tempoBeatIntervalMs
 }
 
-// play запускает фоновый цикл ударных для выбранного стиля (сейчас — pop).
+// play переключает воспроизведение: первый вызов — старт, повторный — стоп.
 func play() {
 	if playing {
+		stop()
 		return
 	}
 	playing = true
 	go runPlayerLoop()
+}
+
+func stop() {
+	playing = false
+	SendNoteOff(drumChannel, noteKick)
+	SendNoteOff(drumChannel, noteSnare)
+	SendNoteOff(drumChannel, noteHiHat)
+	println("style_stop")
 }
 
 func runPlayerLoop() {
