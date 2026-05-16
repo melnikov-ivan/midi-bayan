@@ -19,6 +19,9 @@ var tempoBeatIntervalMs int64
 // Время последнего CMD_TEMPO (Unix мс).
 var tempoLastTapMs int64
 
+// selectedStyle — выбранный стиль (1=pop, 2=rock, 3=disco, 4=waltz).
+var selectedStyle byte = 1
+
 // audioBroadcastChannels — каналы, на которые транслируются общие аудио-настройки.
 // 0 — Melody, 1 — Chord, 2 — Bass (см. pwa/index.html).
 var audioBroadcastChannels = [...]byte{0, 1, 2}
@@ -138,12 +141,21 @@ func handleSetAudio(payload []byte) bool {
 	return true
 }
 
-// handleStyle обрабатывает команду style: payload пуст (запуск стиля с PWA).
+// handleStyle: payload пуст — пуск; payload [1..4] — сохранить стиль (pop/rock/disco/waltz).
 func handleStyle(payload []byte) bool {
-	if len(payload) != 0 {
+	if len(payload) == 0 {
+		println("style_play, style=", selectedStyle)
+		return true
+	}
+	if len(payload) != 1 {
 		return false
 	}
-	println("style_play")
+	style := payload[0]
+	if style < 1 || style > 4 {
+		return false
+	}
+	selectedStyle = style
+	println("style_set:", style)
 	return true
 }
 

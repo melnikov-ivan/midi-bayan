@@ -112,6 +112,16 @@
 
             <button class="btn-secondary" onclick="showScreen('screenMenu')">← Назад</button>
 
+            <div class="input-group">
+                <label>Стиль</label>
+                <select id="styleValue" onchange="sendSetStyle()">
+                    <option value="1">Pop</option>
+                    <option value="2">Rock</option>
+                    <option value="3">Disco</option>
+                    <option value="4">Waltz</option>
+                </select>
+            </div>
+
             <button class="btn-primary" onclick="sendStylePlay()">▶ Пуск</button>
             <button class="btn-primary" onclick="sendGetTempo()">🎵 Темп</button>
             <p class="style-tempo-line">Темп: <span id="styleTempoBpm">—</span> BPM</p>
@@ -279,6 +289,21 @@
                 console.log('Отправлено get_audio');
             } catch (error) {
                 console.error('Ошибка отправки get_audio:', error);
+            }
+        }
+
+        async function sendSetStyle() {
+            try {
+                const style = parseInt(document.getElementById('styleValue').value, 10);
+                if (isNaN(style) || style < 1 || style > 4) {
+                    console.log('Ошибка валидации style:', style);
+                    return;
+                }
+                const msg = buildStyleSetMessage(style);
+                await BLE.writeValue(msg);
+                console.log('Отправлено CMD_STYLE (стиль):', style);
+            } catch (error) {
+                console.error('Ошибка отправки style:', error);
             }
         }
 

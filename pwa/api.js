@@ -66,6 +66,18 @@ function buildSetAudioMessage(volume, reverb, chorus, delay) {
     return msg;
 }
 
+function buildStyleSetMessage(style) {
+    const payload = new Uint8Array([style & 0xff]);
+    const payloadLen = payload.length;
+    const msg = new Uint8Array(1 + 2 + payloadLen + 1);
+    msg[0] = CMD_STYLE;
+    msg[1] = payloadLen & 0xff;
+    msg[2] = (payloadLen >> 8) & 0xff;
+    msg.set(payload, 3);
+    msg[3 + payloadLen] = crc8(msg.subarray(0, 3 + payloadLen));
+    return msg;
+}
+
 function buildStylePlayMessage() {
     const payloadLen = 0;
     const msg = new Uint8Array(1 + 2 + payloadLen + 1);
