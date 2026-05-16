@@ -2,6 +2,8 @@ const CMD_GET_PROGRAM = 0x01;
 const CMD_SET_PROGRAM = 0x02;
 const CMD_SET_AUDIO = 0x03;
 const CMD_GET_AUDIO = 0x04;
+const CMD_STYLE = 0x05;
+const CMD_TEMPO = 0x06;
 
 function crc8(data) {
     let crc = 0;
@@ -60,6 +62,38 @@ function buildSetAudioMessage(volume, reverb, chorus, delay) {
     msg[1] = payloadLen & 0xff;
     msg[2] = (payloadLen >> 8) & 0xff;
     msg.set(payload, 3);
+    msg[3 + payloadLen] = crc8(msg.subarray(0, 3 + payloadLen));
+    return msg;
+}
+
+function buildStyleSetMessage(style) {
+    const payload = new Uint8Array([style & 0xff]);
+    const payloadLen = payload.length;
+    const msg = new Uint8Array(1 + 2 + payloadLen + 1);
+    msg[0] = CMD_STYLE;
+    msg[1] = payloadLen & 0xff;
+    msg[2] = (payloadLen >> 8) & 0xff;
+    msg.set(payload, 3);
+    msg[3 + payloadLen] = crc8(msg.subarray(0, 3 + payloadLen));
+    return msg;
+}
+
+function buildStylePlayMessage() {
+    const payloadLen = 0;
+    const msg = new Uint8Array(1 + 2 + payloadLen + 1);
+    msg[0] = CMD_STYLE;
+    msg[1] = payloadLen & 0xff;
+    msg[2] = (payloadLen >> 8) & 0xff;
+    msg[3 + payloadLen] = crc8(msg.subarray(0, 3 + payloadLen));
+    return msg;
+}
+
+function buildGetTempoMessage() {
+    const payloadLen = 0;
+    const msg = new Uint8Array(1 + 2 + payloadLen + 1);
+    msg[0] = CMD_TEMPO;
+    msg[1] = payloadLen & 0xff;
+    msg[2] = (payloadLen >> 8) & 0xff;
     msg[3 + payloadLen] = crc8(msg.subarray(0, 3 + payloadLen));
     return msg;
 }

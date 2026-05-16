@@ -388,3 +388,15 @@ input[type="range"]::-moz-range-thumb {
 .screen.screen-hidden {
     display: none;
 }
+
+.style-tempo-line {
+    margin-top: 16px;
+    text-align: center;
+    color: #444;
+    font-size: 17px;
+}
+
+.style-tempo-line span {
+    font-weight: 700;
+    color: #333;
+}
