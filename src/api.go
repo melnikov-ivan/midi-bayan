@@ -136,6 +136,7 @@ func handleSetAudio(payload []byte) bool {
 func handleStyle(payload []byte) bool {
 	if len(payload) == 0 {
 		println("style_play, style=", SelectedStyle())
+		play()
 		return true
 	}
 	if len(payload) != 1 {
