@@ -13,15 +13,6 @@ const (
 	cmdTempo      byte = 0x06 // тап по «Темп» в PWA + ответ BPM по BLE
 )
 
-// Интервал между последними двумя нажатиями «Темп» (CMD_TEMPO), мс; 0 — ещё не было пары валидных тапов.
-var tempoBeatIntervalMs int64
-
-// Время последнего CMD_TEMPO (Unix мс).
-var tempoLastTapMs int64
-
-// selectedStyle — выбранный стиль (1=pop, 2=rock, 3=disco, 4=waltz).
-var selectedStyle byte = 1
-
 // audioBroadcastChannels — каналы, на которые транслируются общие аудио-настройки.
 // 0 — Melody, 1 — Chord, 2 — Bass (см. pwa/index.html).
 var audioBroadcastChannels = [...]byte{0, 1, 2}
@@ -144,7 +135,7 @@ func handleSetAudio(payload []byte) bool {
 // handleStyle: payload пуст — пуск; payload [1..4] — сохранить стиль (pop/rock/disco/waltz).
 func handleStyle(payload []byte) bool {
 	if len(payload) == 0 {
-		println("style_play, style=", selectedStyle)
+		println("style_play, style=", SelectedStyle())
 		return true
 	}
 	if len(payload) != 1 {
@@ -154,7 +145,7 @@ func handleStyle(payload []byte) bool {
 	if style < 1 || style > 4 {
 		return false
 	}
-	selectedStyle = style
+	SetSelectedStyle(style)
 	println("style_set:", style)
 	return true
 }
@@ -164,26 +155,7 @@ func handleTempo(payload []byte) (bpm uint16, ok bool) {
 	if len(payload) != 0 {
 		return 0, false
 	}
-	now := time.Now().UnixMilli()
-	if tempoLastTapMs > 0 {
-		d := now - tempoLastTapMs
-		// ~20–300 BPM
-		if d >= 180 && d <= 3000 {
-			tempoBeatIntervalMs = d
-		}
-	}
-	tempoLastTapMs = now
-
-	if tempoBeatIntervalMs <= 0 {
-		return 120, true
-	}
-	x := (60000 + tempoBeatIntervalMs/2) / tempoBeatIntervalMs
-	if x < 20 {
-		x = 20
-	}
-	if x > 320 {
-		x = 320
-	}
-	println("tempo: bpm=", x, "interval_ms=", tempoBeatIntervalMs)
-	return uint16(x), true
+	bpm = TapTempo(time.Now().UnixMilli())
+	println("tempo: bpm=", bpm, "interval_ms=", TempoBeatIntervalMs())
+	return bpm, true
 }
