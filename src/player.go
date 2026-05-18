@@ -7,7 +7,8 @@ const (
 	noteKick    = 36
 	noteSnare   = 38
 	noteHiHat   = 42
-	stylePop    = 1
+	styleMetronome = 0
+	stylePop       = 1
 )
 
 // Интервал между последними двумя нажатиями «Темп» (CMD_TEMPO), мс; 0 — ещё не было пары валидных тапов.
@@ -16,13 +17,25 @@ var tempoBeatIntervalMs int64
 // Время последнего CMD_TEMPO (Unix мс).
 var tempoLastTapMs int64
 
-// selectedStyle — выбранный стиль (1=pop, 2=rock, 3=disco, 4=waltz).
+// selectedStyle — выбранный стиль (0=metronome, 1=pop, 2=rock, 3=disco, 4=waltz).
 var selectedStyle byte = 1
 
 var playing bool
 
 type drumStep struct {
 	kick, snare, hat bool
+}
+
+// metronomePattern — щелчок на каждую четверть; акцент (kick) на первой доле.
+var metronomePattern = []drumStep{
+	{kick: true},
+	{},
+	{hat: true},
+	{},
+	{hat: true},
+	{},
+	{hat: true},
+	{},
 }
 
 // popPattern — 8 долей в такте: kick на 1 и 3, snare на 2 и 4, hi-hat на каждую долю.
@@ -107,6 +120,8 @@ func runPlayerLoop() {
 
 func patternForStyle(style byte) []drumStep {
 	switch style {
+	case styleMetronome:
+		return metronomePattern
 	case stylePop:
 		return popPattern
 	default:

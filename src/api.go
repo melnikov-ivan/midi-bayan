@@ -132,7 +132,7 @@ func handleSetAudio(payload []byte) bool {
 	return true
 }
 
-// handleStyle: payload пуст — пуск; payload [1..4] — сохранить стиль (pop/rock/disco/waltz).
+// handleStyle: payload пуст — пуск; payload [0..4] — сохранить стиль (metronome/pop/rock/disco/waltz).
 func handleStyle(payload []byte) bool {
 	if len(payload) == 0 {
 		println("style_play, style=", SelectedStyle())
@@ -143,7 +143,7 @@ func handleStyle(payload []byte) bool {
 		return false
 	}
 	style := payload[0]
-	if style < 1 || style > 4 {
+	if style > 4 {
 		return false
 	}
 	SetSelectedStyle(style)
