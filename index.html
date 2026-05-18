@@ -115,6 +115,7 @@
             <div class="input-group">
                 <label>Стиль</label>
                 <select id="styleValue" onchange="sendSetStyle()">
+                    <option value="0">Метроном</option>
                     <option value="1">Pop</option>
                     <option value="2">Rock</option>
                     <option value="3">Disco</option>
@@ -297,7 +298,7 @@
         async function sendSetStyle() {
             try {
                 const style = parseInt(document.getElementById('styleValue').value, 10);
-                if (isNaN(style) || style < 1 || style > 4) {
+                if (isNaN(style) || style < 0 || style > 4) {
                     console.log('Ошибка валидации style:', style);
                     return;
                 }
