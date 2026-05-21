@@ -98,32 +98,30 @@ func handleSetProgram(payload []byte) bool {
 }
 
 // handleGetAudio обрабатывает команду get_audio: payload пуст.
-// Возвращает текущие общие аудио-настройки (volume, reverb, chorus, delay).
-func handleGetAudio(payload []byte) (volume, reverb, chorus, delay byte, ok bool) {
+// Возвращает текущие общие аудио-настройки (reverb, chorus, delay).
+func handleGetAudio(payload []byte) (reverb, chorus, delay byte, ok bool) {
 	if len(payload) != 0 {
-		return 0, 0, 0, 0, false
+		return 0, 0, 0, false
 	}
 	a := AudioConfig
-	println("get_audio: volume=", a.Volume, "reverb=", a.Reverb, "chorus=", a.Chorus, "delay=", a.Delay)
-	return a.Volume, a.Reverb, a.Chorus, a.Delay, true
+	println("get_audio: reverb=", a.Reverb, "chorus=", a.Chorus, "delay=", a.Delay)
+	return a.Reverb, a.Chorus, a.Delay, true
 }
 
-// handleSetAudio обрабатывает команду set_audio: payload = [volume, reverb, chorus, delay].
+// handleSetAudio обрабатывает команду set_audio: payload = [reverb, chorus, delay].
 // Сохраняет общие аудио-настройки и рассылает соответствующие MIDI CC через EventChannel
 // на все используемые каналы (audioBroadcastChannels).
 func handleSetAudio(payload []byte) bool {
-	if len(payload) != 4 {
+	if len(payload) != 3 {
 		return false
 	}
-	volume := payload[0]
-	reverb := payload[1]
-	chorus := payload[2]
-	delay := payload[3]
-	SetAudioConfig(volume, reverb, chorus, delay)
-	println("set_audio: volume=", volume, "reverb=", reverb, "chorus=", chorus, "delay=", delay)
+	reverb := payload[0]
+	chorus := payload[1]
+	delay := payload[2]
+	SetAudioConfig(reverb, chorus, delay)
+	println("set_audio: reverb=", reverb, "chorus=", chorus, "delay=", delay)
 	if EventChannel != nil {
 		for _, ch := range audioBroadcastChannels {
-			EventChannel <- Event{Type: Volume, Channel: ch, Volume: volume}
 			EventChannel <- Event{Type: Reverb, Channel: ch, CCValue: reverb}
 			EventChannel <- Event{Type: Chorus, Channel: ch, CCValue: chorus}
 			EventChannel <- Event{Type: Delay, Channel: ch, CCValue: delay}

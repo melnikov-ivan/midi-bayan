@@ -46,9 +46,8 @@ func SetChannelConfig(channel, instrument, volume, octave byte) {
 	}
 }
 
-// AudioSettings — общие аудио-параметры: громкость и глубина эффектов (0–127).
+// AudioSettings — общие аудио-параметры: глубина эффектов (0–127).
 type AudioSettings struct {
-	Volume byte
 	Reverb byte
 	Chorus byte
 	Delay  byte
@@ -56,16 +55,14 @@ type AudioSettings struct {
 
 // AudioConfig — текущие общие аудио-настройки, применяемые ко всем используемым каналам.
 var AudioConfig = AudioSettings{
-	Volume: 100,
 	Reverb: 0,
 	Chorus: 0,
 	Delay:  0,
 }
 
 // SetAudioConfig сохраняет общие аудио-настройки.
-func SetAudioConfig(volume, reverb, chorus, delay byte) {
+func SetAudioConfig(reverb, chorus, delay byte) {
 	AudioConfig = AudioSettings{
-		Volume: volume,
 		Reverb: reverb,
 		Chorus: chorus,
 		Delay:  delay,
