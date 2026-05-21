@@ -11,6 +11,7 @@ const (
 	stylePop       = 1
 	styleRock      = 2
 	styleDisco     = 3
+	styleWaltz     = 4
 )
 
 // Интервал между последними двумя нажатиями «Темп» (CMD_TEMPO), мс; 0 — ещё не было пары валидных тапов.
@@ -73,6 +74,16 @@ var discoPattern = []drumStep{
 	{kick: true, hat: true},
 	{hat: true},
 	{kick: true, snare: true, hat: true},
+	{hat: true},
+}
+
+// waltzPattern — размер 3/4: kick на 1, snare на 2 и 3, hi-hat на каждую восьмую.
+var waltzPattern = []drumStep{
+	{kick: true, hat: true},
+	{hat: true},
+	{snare: true, hat: true},
+	{hat: true},
+	{snare: true, hat: true},
 	{hat: true},
 }
 
@@ -154,8 +165,10 @@ func patternForStyle(style byte) []drumStep {
 		return rockPattern
 	case styleDisco:
 		return discoPattern
+	case styleWaltz:
+		return waltzPattern
 	default:
-		return popPattern
+		return metronomePattern
 	}
 }
 
