@@ -10,6 +10,7 @@ const (
 	styleMetronome = 0
 	stylePop       = 1
 	styleRock      = 2
+	styleDisco     = 3
 )
 
 // Интервал между последними двумя нажатиями «Темп» (CMD_TEMPO), мс; 0 — ещё не было пары валидных тапов.
@@ -60,6 +61,18 @@ var rockPattern = []drumStep{
 	{kick: true, hat: true},
 	{hat: true},
 	{snare: true, hat: true},
+	{hat: true},
+}
+
+// discoPattern — «four on the floor»: kick на каждую четверть, snare на 2 и 4, hi-hat на каждую восьмую.
+var discoPattern = []drumStep{
+	{kick: true, hat: true},
+	{hat: true},
+	{kick: true, snare: true, hat: true},
+	{hat: true},
+	{kick: true, hat: true},
+	{hat: true},
+	{kick: true, snare: true, hat: true},
 	{hat: true},
 }
 
@@ -139,6 +152,8 @@ func patternForStyle(style byte) []drumStep {
 		return popPattern
 	case styleRock:
 		return rockPattern
+	case styleDisco:
+		return discoPattern
 	default:
 		return popPattern
 	}
