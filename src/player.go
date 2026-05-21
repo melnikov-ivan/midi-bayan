@@ -18,7 +18,7 @@ var tempoBeatIntervalMs int64
 var tempoLastTapMs int64
 
 // selectedStyle — выбранный стиль (0=metronome, 1=pop, 2=rock, 3=disco, 4=waltz).
-var selectedStyle byte = 1
+var selectedStyle byte = styleMetronome
 
 var playing bool
 
