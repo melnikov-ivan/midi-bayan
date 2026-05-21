@@ -132,13 +132,12 @@ func StartBLEService() {
 			case cmdSetProgram:
 				handleSetProgram(payload)
 			case cmdGetAudio:
-				if vol, rev, chor, del, ok := handleGetAudio(payload); ok {
+				if rev, chor, del, ok := handleGetAudio(payload); ok {
 					charValueBuf[0] = cmdGetAudio
-					charValueBuf[1] = vol
-					charValueBuf[2] = rev
-					charValueBuf[3] = chor
-					charValueBuf[4] = del
-					configChar.Write(charValueBuf[:5])
+					charValueBuf[1] = rev
+					charValueBuf[2] = chor
+					charValueBuf[3] = del
+					configChar.Write(charValueBuf[:4])
 				}
 			case cmdSetAudio:
 				handleSetAudio(payload)

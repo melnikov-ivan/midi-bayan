@@ -81,12 +81,6 @@
             <button class="btn-secondary" onclick="showScreen('screenMenu')">← Назад</button>
 
             <div class="input-group">
-                <label>Громкость <span id="audioVolumeDisplay">100</span></label>
-                <input type="range" id="audioVolume" min="0" max="127" value="100"
-                    oninput="document.getElementById('audioVolumeDisplay').textContent=this.value"
-                    onchange="sendSetAudio()" />
-            </div>
-            <div class="input-group">
                 <label>Реверб <span id="audioReverbDisplay">0</span></label>
                 <input type="range" id="audioReverb" min="0" max="127" value="0"
                     oninput="document.getElementById('audioReverbDisplay').textContent=this.value"
@@ -210,13 +204,12 @@
             document.getElementById('octaveValueDisplay').textContent = octaveClamped;
         }
 
-        function fillAudioFields(volume, reverb, chorus, delay) {
+        function fillAudioFields(reverb, chorus, delay) {
             const setSlider = (id, displayId, value) => {
                 const v = Math.max(0, Math.min(127, Number(value) & 0x7f));
                 document.getElementById(id).value = v;
                 document.getElementById(displayId).textContent = v;
             };
-            setSlider('audioVolume', 'audioVolumeDisplay', volume);
             setSlider('audioReverb', 'audioReverbDisplay', reverb);
             setSlider('audioChorus', 'audioChorusDisplay', chorus);
             setSlider('audioDelay', 'audioDelayDisplay', delay);
@@ -236,9 +229,9 @@
                     }
                     break;
                 case CMD_GET_AUDIO:
-                    if (bytes.length >= 5) {
-                        console.log('  get_audio: громкость:', bytes[1], 'реверб:', bytes[2], 'хорус:', bytes[3], 'дилей:', bytes[4]);
-                        fillAudioFields(bytes[1], bytes[2], bytes[3], bytes[4]);
+                    if (bytes.length >= 4) {
+                        console.log('  get_audio: реверб:', bytes[1], 'хорус:', bytes[2], 'дилей:', bytes[3]);
+                        fillAudioFields(bytes[1], bytes[2], bytes[3]);
                     }
                     break;
                 case CMD_STYLE:
@@ -341,18 +334,17 @@
 
         async function sendSetAudio() {
             try {
-                const volume = parseInt(document.getElementById('audioVolume').value, 10);
                 const reverb = parseInt(document.getElementById('audioReverb').value, 10);
                 const chorus = parseInt(document.getElementById('audioChorus').value, 10);
                 const delay = parseInt(document.getElementById('audioDelay').value, 10);
                 const inRange = (v) => !isNaN(v) && v >= 0 && v <= 127;
-                if (!inRange(volume) || !inRange(reverb) || !inRange(chorus) || !inRange(delay)) {
-                    console.log('Ошибка валидации set_audio:', volume, reverb, chorus, delay);
+                if (!inRange(reverb) || !inRange(chorus) || !inRange(delay)) {
+                    console.log('Ошибка валидации set_audio:', reverb, chorus, delay);
                     return;
                 }
-                const msg = buildSetAudioMessage(volume, reverb, chorus, delay);
+                const msg = buildSetAudioMessage(reverb, chorus, delay);
                 await BLE.writeValue(msg);
-                console.log('Отправлено set_audio:', volume, reverb, chorus, delay);
+                console.log('Отправлено set_audio:', reverb, chorus, delay);
             } catch (error) {
                 console.log('Ошибка отправки set_audio:', error);
             }

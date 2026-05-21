@@ -54,8 +54,8 @@ function buildGetAudioMessage() {
     return msg;
 }
 
-function buildSetAudioMessage(volume, reverb, chorus, delay) {
-    const payload = new Uint8Array([volume & 0xff, reverb & 0xff, chorus & 0xff, delay & 0xff]);
+function buildSetAudioMessage(reverb, chorus, delay) {
+    const payload = new Uint8Array([reverb & 0xff, chorus & 0xff, delay & 0xff]);
     const payloadLen = payload.length;
     const msg = new Uint8Array(1 + 2 + payloadLen + 1);
     msg[0] = CMD_SET_AUDIO;
