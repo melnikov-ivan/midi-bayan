@@ -3,12 +3,13 @@ package main
 import "time"
 
 const (
-	drumChannel = 9 // GM percussion (channel 10)
-	noteKick    = 36
-	noteSnare   = 38
-	noteHiHat   = 42
+	drumChannel    = 9 // GM percussion (channel 10)
+	noteKick       = 36
+	noteSnare      = 38
+	noteHiHat      = 42
 	styleMetronome = 0
 	stylePop       = 1
+	styleRock      = 2
 )
 
 // Интервал между последними двумя нажатиями «Темп» (CMD_TEMPO), мс; 0 — ещё не было пары валидных тапов.
@@ -44,6 +45,18 @@ var popPattern = []drumStep{
 	{hat: true},
 	{snare: true, hat: true},
 	{hat: true},
+	{kick: true, hat: true},
+	{hat: true},
+	{snare: true, hat: true},
+	{hat: true},
+}
+
+// rockPattern — прямой рок-бит с более плотной бочкой: kick на 1, 2&, 3; snare на 2 и 4; hi-hat на каждую восьмую.
+var rockPattern = []drumStep{
+	{kick: true, hat: true},
+	{hat: true},
+	{snare: true, hat: true},
+	{kick: true, hat: true},
 	{kick: true, hat: true},
 	{hat: true},
 	{snare: true, hat: true},
@@ -124,6 +137,8 @@ func patternForStyle(style byte) []drumStep {
 		return metronomePattern
 	case stylePop:
 		return popPattern
+	case styleRock:
+		return rockPattern
 	default:
 		return popPattern
 	}
