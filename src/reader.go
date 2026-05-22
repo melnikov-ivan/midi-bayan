@@ -51,13 +51,14 @@ func PlayMIDIFile() {
 	}
 
 	tempoUs := uint32(500000) // shared across tracks; updated by tempo meta events
+	startMs := time.Now().UnixMilli()
 
 	if format == 1 && len(spans) > 1 {
 		done := make(chan struct{}, len(spans))
 		for _, s := range spans {
 			s := s
 			go func() {
-				playTrack(d, s.pos, s.end, ppqn, &tempoUs)
+				playTrack(d, s.pos, s.end, ppqn, &tempoUs, startMs)
 				done <- struct{}{}
 			}()
 		}
@@ -66,12 +67,13 @@ func PlayMIDIFile() {
 		}
 	} else {
 		for _, s := range spans {
-			playTrack(d, s.pos, s.end, ppqn, &tempoUs)
+			playTrack(d, s.pos, s.end, ppqn, &tempoUs, startMs)
 		}
 	}
 }
 
-func playTrack(d []byte, pos, end int, ppqn uint32, tempoUs *uint32) {
+func playTrack(d []byte, pos, end int, ppqn uint32, tempoUs *uint32, startMs int64) {
+	var absoluteMs int64 // milliseconds elapsed from startMs at the current tick position
 	var lastStatus byte
 	for pos < end {
 		delta, n := midiVarLen(d[pos:])
@@ -80,11 +82,9 @@ func playTrack(d []byte, pos, end int, ppqn uint32, tempoUs *uint32) {
 			break
 		}
 
-		if delta > 0 {
-			ms := int64(delta) * int64(*tempoUs) / int64(ppqn) / 1000
-			if ms > 0 {
-				time.Sleep(time.Duration(ms) * time.Millisecond)
-			}
+		absoluteMs += int64(delta) * int64(*tempoUs) / int64(ppqn) / 1000
+		if ms := startMs + absoluteMs - time.Now().UnixMilli(); ms > 0 {
+			time.Sleep(time.Duration(ms) * time.Millisecond)
 		}
 
 		if d[pos]&0x80 != 0 {
