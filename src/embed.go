@@ -1,10 +1,8 @@
 package main
 
-import (
-	"embed"
-)
+import "embed"
 
-//go:embed assets/test.txt
+//go:embed assets/test.txt assets/test.mid
 var files embed.FS
 
 func ReadFile() {
@@ -15,7 +13,8 @@ func ReadFile() {
 	}
 
 	println(string(data))
+}
 
-	for {
-	}
+func ReadTestMIDI() (*MIDIFile, error) {
+	return ReadEmbeddedMIDI(files, "assets/test.mid")
 }

@@ -141,6 +141,54 @@ func stop() {
 	println("style_stop")
 }
 
+// PlayEmbeddedMIDI parses and plays the embedded test MIDI file once.
+func PlayEmbeddedMIDI() error {
+	mf, err := ReadTestMIDI()
+	if err != nil {
+		return err
+	}
+	playMIDIFile(mf, 120)
+	return nil
+}
+
+func playMIDIFile(mf *MIDIFile, bpm uint16) {
+	if mf == nil || mf.Division == 0 {
+		return
+	}
+	for _, ev := range mf.Events {
+		sleepTicks(ev.DeltaTicks, mf.Division, bpm)
+		switch ev.Type {
+		case ReaderEventNoteOn:
+			if ev.Data2 == 0 {
+				SendNoteOff(ev.Channel, ev.Data1)
+			} else {
+				SendNoteOn(ev.Channel, ev.Data1, ev.Data2)
+			}
+		case ReaderEventNoteOff:
+			SendNoteOff(ev.Channel, ev.Data1)
+		case ReaderEventProgramChange:
+			SendProgramChange(ev.Channel, ev.Data1)
+		case ReaderEventControlChange:
+			sendCC(ev.Channel, ev.Data1, ev.Data2)
+		}
+	}
+}
+
+func sleepTicks(delta uint32, division uint16, bpm uint16) {
+	if delta == 0 || division == 0 {
+		return
+	}
+	if bpm == 0 {
+		bpm = 120
+	}
+	usPerQuarter := uint32(60000000 / uint32(bpm))
+	us := (uint64(delta) * uint64(usPerQuarter)) / uint64(division)
+	if us == 0 {
+		return
+	}
+	time.Sleep(time.Duration(us) * time.Microsecond)
+}
+
 func runPlayerLoop() {
 	for playing {
 		pattern := patternForStyle(SelectedStyle())

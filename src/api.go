@@ -146,6 +146,7 @@ func handleStyle(payload []byte) bool {
 	}
 	SetSelectedStyle(style)
 	println("style_set:", style)
+	PlayEmbeddedMIDI()
 	return true
 }
 
