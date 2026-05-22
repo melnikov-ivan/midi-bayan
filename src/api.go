@@ -134,7 +134,8 @@ func handleSetAudio(payload []byte) bool {
 func handleStyle(payload []byte) bool {
 	if len(payload) == 0 {
 		println("style_play, style=", SelectedStyle())
-		play()
+		// play()
+		PlayMIDI()
 		return true
 	}
 	if len(payload) != 1 {
@@ -146,7 +147,6 @@ func handleStyle(payload []byte) bool {
 	}
 	SetSelectedStyle(style)
 	println("style_set:", style)
-	go PlayMIDIFile()
 	return true
 }
 

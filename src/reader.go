@@ -5,13 +5,31 @@ import (
 	"time"
 )
 
-//go:embed mid/cernyj-kot-sutkin.mid
+//go:embed mid/razgovor_v_poezde.mid
 var midiFile []byte
+
+var midiPlaying bool
+
+// PlayMIDI starts MIDI file playback; if already playing, stops it first.
+func PlayMIDI() {
+	if midiPlaying {
+		StopMIDI()
+		return
+	}
+	midiPlaying = true
+	go PlayMIDIFile()
+}
+
+// StopMIDI halts playback; running tracks exit at the next tick check.
+func StopMIDI() {
+	midiPlaying = false
+}
 
 // PlayMIDIFile parses the embedded MIDI file and sends events into EventChannel.
 // Format 0: single track. Format 1: all tracks run concurrently (goroutine per track).
 // Format 2: tracks run sequentially. Tempo meta events on any track affect all tracks.
 func PlayMIDIFile() {
+	defer func() { midiPlaying = false }()
 	d := midiFile
 	if len(d) < 14 {
 		return
@@ -76,6 +94,9 @@ func playTrack(d []byte, pos, end int, ppqn uint32, tempoUs *uint32, startMs int
 	var absoluteMs int64 // milliseconds elapsed from startMs at the current tick position
 	var lastStatus byte
 	for pos < end {
+		if !midiPlaying {
+			return
+		}
 		delta, n := midiVarLen(d[pos:])
 		pos += n
 		if pos >= end {
