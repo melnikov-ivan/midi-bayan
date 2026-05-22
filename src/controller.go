@@ -96,7 +96,7 @@ func main() {
 
 func blink() {
 	led.High()
-	time.Sleep(50 * time.Millisecond)
+	// time.Sleep(50 * time.Millisecond)
 	led.Low()
 }
 
