@@ -7,8 +7,8 @@ import (
 const (
 	cmdGetProgram byte = 0x01
 	cmdSetProgram byte = 0x02
-	cmdSetAudio   byte = 0x03
-	cmdGetAudio   byte = 0x04
+	cmdGetAudio   byte = 0x03
+	cmdSetAudio   byte = 0x04
 	cmdStyle      byte = 0x05 // стиль / пуск (PWA: экран «Стиль»)
 	cmdTempo      byte = 0x06 // тап по «Темп» в PWA + ответ BPM по BLE
 	cmdPlay       byte = 0x07 // пуск/стоп воспроизведения MIDI-файла
