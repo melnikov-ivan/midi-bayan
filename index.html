@@ -32,6 +32,7 @@
             <button class="btn-primary" onclick="showScreen('screenSettings')">⚙️ Настройки</button>
             <button class="btn-primary" onclick="showScreen('screenAudio')">🔊 Аудио</button>
             <button class="btn-primary" onclick="showScreen('screenStyle')">🎹 Стиль</button>
+            <button class="btn-primary" onclick="showScreen('screenMidi')">🎵 MIDI</button>
             <button id="disconnectBtnMenu" class="btn-danger" onclick="disconnect()">Отключиться</button>
         </div>
 
@@ -98,6 +99,15 @@
                     oninput="document.getElementById('audioDelayDisplay').textContent=this.value"
                     onchange="sendSetAudio()" />
             </div>
+        </div>
+
+        <!-- Экран MIDI-плеера: команда CMD_PLAY (пуск/стоп MIDI-файла) -->
+        <div id="screenMidi" class="screen screen-hidden">
+            <h1>🎵 MIDI</h1>
+
+            <button class="btn-secondary" onclick="showScreen('screenMenu')">← Назад</button>
+
+            <button id="midiPlayBtn" class="btn-primary" onclick="sendPlay()">▶ Пуск</button>
         </div>
 
         <!-- Экран стиля: команда CMD_STYLE (пуск) -->
@@ -183,6 +193,8 @@
                 onDisconnected: () => {
                     stylePlaying = false;
                     updateStylePlayButton();
+                    midiFilePlaying = false;
+                    updateMidiPlayButton();
                     showScreen('screenEntrance');
                 },
                 onValue: processCharacteristicValue
@@ -304,6 +316,24 @@
         }
 
         let stylePlaying = false;
+        let midiFilePlaying = false;
+
+        function updateMidiPlayButton() {
+            const btn = document.getElementById('midiPlayBtn');
+            if (btn) btn.textContent = midiFilePlaying ? '⏹ Стоп' : '▶ Пуск';
+        }
+
+        async function sendPlay() {
+            try {
+                const msg = buildPlayMessage();
+                await BLE.writeValue(msg);
+                midiFilePlaying = !midiFilePlaying;
+                updateMidiPlayButton();
+                console.log(midiFilePlaying ? 'Отправлено CMD_PLAY (пуск)' : 'Отправлено CMD_PLAY (стоп)');
+            } catch (error) {
+                console.error('Ошибка отправки play:', error);
+            }
+        }
 
         function updateStylePlayButton() {
             const btn = document.getElementById('stylePlayBtn');

@@ -1,9 +1,10 @@
 const CMD_GET_PROGRAM = 0x01;
 const CMD_SET_PROGRAM = 0x02;
-const CMD_SET_AUDIO = 0x03;
-const CMD_GET_AUDIO = 0x04;
+const CMD_GET_AUDIO = 0x03;
+const CMD_SET_AUDIO = 0x04;
 const CMD_STYLE = 0x05;
 const CMD_TEMPO = 0x06;
+const CMD_PLAY  = 0x07;
 
 function crc8(data) {
     let crc = 0;
@@ -85,6 +86,15 @@ function buildStylePlayMessage() {
     msg[1] = payloadLen & 0xff;
     msg[2] = (payloadLen >> 8) & 0xff;
     msg[3 + payloadLen] = crc8(msg.subarray(0, 3 + payloadLen));
+    return msg;
+}
+
+function buildPlayMessage() {
+    const msg = new Uint8Array(4); // cmd(1) + len(2) + crc(1), payload=0
+    msg[0] = CMD_PLAY;
+    msg[1] = 0;
+    msg[2] = 0;
+    msg[3] = crc8(msg.subarray(0, 3));
     return msg;
 }
 
