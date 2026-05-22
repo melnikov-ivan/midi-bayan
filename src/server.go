@@ -143,6 +143,8 @@ func StartBLEService() {
 				handleSetAudio(payload)
 			case cmdStyle:
 				handleStyle(payload)
+			case cmdPlay:
+				handlePlay(payload)
 			case cmdTempo:
 				if bpm, ok := handleTempo(payload); ok {
 					charValueBuf[0] = cmdTempo
