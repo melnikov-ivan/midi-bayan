@@ -6,6 +6,7 @@ package main
 //   tinygo monitor
 import (
 	"machine"
+	"sync"
 	"time"
 )
 
@@ -42,8 +43,36 @@ type Event struct {
 
 var led = machine.LED
 
-// EventChannel — общий канал событий: клавиатура (RunKeyboard) и BLE (handleSetProgram Program Change).
+// EventChannel — интерактивные события: клавиатура и BLE (конфиг). SMF-плеер шлёт MIDI через dispatchEvent.
 var EventChannel chan Event
+
+var midiOutMu sync.Mutex
+
+// dispatchEvent отправляет MIDI на все выходы; безопасен при вызове из нескольких горутин (SMF format 1).
+func dispatchEvent(ev Event) {
+	midiOutMu.Lock()
+	defer midiOutMu.Unlock()
+	switch ev.Type {
+	case ProgramChange:
+		SendProgramChange(ev.Channel, ev.Program)
+	case Volume:
+		SendVolume(ev.Channel, ev.Volume)
+	case Reverb:
+		SendReverb(ev.Channel, ev.CCValue)
+	case Chorus:
+		SendChorus(ev.Channel, ev.CCValue)
+	case Delay:
+		SendDelay(ev.Channel, ev.CCValue)
+	case NoteOff:
+		SendNoteOff(ev.Channel, ev.Note)
+	case NoteOn:
+		if ev.Velocity == 0 {
+			SendNoteOff(ev.Channel, ev.Note)
+		} else {
+			SendNoteOn(ev.Channel, ev.Note, ev.Velocity)
+		}
+	}
+}
 
 func main() {
 	led.Configure(machine.PinConfig{Mode: machine.PinOutput})
@@ -52,7 +81,7 @@ func main() {
 	startMidiOut()
 	println("MIDI Controller (UART) запущен")
 
-	EventChannel = make(chan Event, 8)
+	EventChannel = make(chan Event, 32)
 	go StartBLEService()
 	go RunKeyboard(EventChannel)
 
@@ -60,43 +89,30 @@ func main() {
 
 	// Ноты и параметры MIDI берутся из keymap; Program Change приходит из BLE (handleSetProgram).
 	for ev := range EventChannel {
+		dispatchEvent(ev)
 		switch ev.Type {
 		case ProgramChange:
-			SendProgramChange(ev.Channel, ev.Program)
 			println("MIDI: Program Change ch=", ev.Channel, "program=", ev.Program)
-			blink()
 		case Volume:
-			SendVolume(ev.Channel, ev.Volume)
 			println("MIDI: Volume ch=", ev.Channel, "volume=", ev.Volume)
-			blink()
 		case Reverb:
-			SendReverb(ev.Channel, ev.CCValue)
 			println("MIDI: Reverb ch=", ev.Channel, "value=", ev.CCValue)
-			blink()
 		case Chorus:
-			SendChorus(ev.Channel, ev.CCValue)
 			println("MIDI: Chorus ch=", ev.Channel, "value=", ev.CCValue)
-			blink()
 		case Delay:
-			SendDelay(ev.Channel, ev.CCValue)
 			println("MIDI: Delay ch=", ev.Channel, "value=", ev.CCValue)
-			blink()
 		case NoteOff:
-			SendNoteOff(ev.Channel, ev.Note)
 			println("MIDI: Note Off", ev.Note)
-			blink()
 		case NoteOn:
 			if ev.Velocity == 0 {
-				SendNoteOff(ev.Channel, ev.Note)
 				println("MIDI: Note Off", ev.Note)
 			} else {
-				SendNoteOn(ev.Channel, ev.Note, ev.Velocity)
 				println("MIDI: Note On ", ev.Note)
 			}
-			blink()
 		default:
-			// неизвестный тип — пропускаем
+			continue
 		}
+		blink()
 	}
 }
 

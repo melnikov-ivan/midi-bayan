@@ -45,7 +45,7 @@ func StopMIDI() {
 	SendAllNotesOff()
 }
 
-// PlayMIDIFile parses the given MIDI data and sends events into EventChannel.
+// PlayMIDIFile parses the given MIDI data and sends MIDI via dispatchEvent (минуя EventChannel).
 // Format 0: single track. Format 1: all tracks run concurrently (goroutine per track).
 // Format 2: tracks run sequentially. Tempo meta events on any track affect all tracks.
 func PlayMIDIFile(data []byte) {
@@ -158,7 +158,7 @@ func playTrack(d []byte, pos, end int, ppqn uint32, tempoUs *uint32, startMs int
 			if pos+2 > end {
 				return
 			}
-			EventChannel <- Event{Type: NoteOff, Channel: lastStatus & 0x0F, Note: d[pos]}
+			dispatchEvent(Event{Type: NoteOff, Channel: lastStatus & 0x0F, Note: d[pos]})
 			pos += 2
 
 		case lastStatus&0xF0 == 0x90: // NoteOn
@@ -169,9 +169,9 @@ func playTrack(d []byte, pos, end int, ppqn uint32, tempoUs *uint32, startMs int
 			note, vel := d[pos], d[pos+1]
 			pos += 2
 			if vel == 0 {
-				EventChannel <- Event{Type: NoteOff, Channel: ch, Note: note}
+				dispatchEvent(Event{Type: NoteOff, Channel: ch, Note: note})
 			} else {
-				EventChannel <- Event{Type: NoteOn, Channel: ch, Note: note, Velocity: vel}
+				dispatchEvent(Event{Type: NoteOn, Channel: ch, Note: note, Velocity: vel})
 			}
 
 		case lastStatus&0xF0 == 0xA0: // Polyphonic Aftertouch
@@ -185,20 +185,20 @@ func playTrack(d []byte, pos, end int, ppqn uint32, tempoUs *uint32, startMs int
 			pos += 2
 			switch cc {
 			case 7:
-				EventChannel <- Event{Type: Volume, Channel: ch, Volume: val}
+				dispatchEvent(Event{Type: Volume, Channel: ch, Volume: val})
 			case 91:
-				EventChannel <- Event{Type: Reverb, Channel: ch, CCValue: val}
+				dispatchEvent(Event{Type: Reverb, Channel: ch, CCValue: val})
 			case 93:
-				EventChannel <- Event{Type: Chorus, Channel: ch, CCValue: val}
+				dispatchEvent(Event{Type: Chorus, Channel: ch, CCValue: val})
 			case 94:
-				EventChannel <- Event{Type: Delay, Channel: ch, CCValue: val}
+				dispatchEvent(Event{Type: Delay, Channel: ch, CCValue: val})
 			}
 
 		case lastStatus&0xF0 == 0xC0: // Program Change
 			if pos+1 > end {
 				return
 			}
-			EventChannel <- Event{Type: ProgramChange, Channel: lastStatus & 0x0F, Program: d[pos]}
+			dispatchEvent(Event{Type: ProgramChange, Channel: lastStatus & 0x0F, Program: d[pos]})
 			pos++
 
 		case lastStatus&0xF0 == 0xD0: // Channel Pressure
