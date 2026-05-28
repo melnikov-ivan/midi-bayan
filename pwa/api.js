@@ -89,12 +89,15 @@ function buildStylePlayMessage() {
     return msg;
 }
 
-function buildPlayMessage() {
-    const msg = new Uint8Array(4); // cmd(1) + len(2) + crc(1), payload=0
+function buildPlayMessage(fileIndex) {
+    const payload = new Uint8Array([fileIndex & 0xff]);
+    const payloadLen = 1;
+    const msg = new Uint8Array(1 + 2 + payloadLen + 1);
     msg[0] = CMD_PLAY;
-    msg[1] = 0;
-    msg[2] = 0;
-    msg[3] = crc8(msg.subarray(0, 3));
+    msg[1] = payloadLen & 0xff;
+    msg[2] = (payloadLen >> 8) & 0xff;
+    msg.set(payload, 3);
+    msg[3 + payloadLen] = crc8(msg.subarray(0, 3 + payloadLen));
     return msg;
 }
 

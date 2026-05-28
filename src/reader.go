@@ -1,23 +1,39 @@
 package main
 
 import (
-	_ "embed"
+	"embed"
 	"time"
 )
 
-//go:embed mid/razgovor_v_poezde.mid
-var midiFile []byte
+//go:embed mid
+var midiFS embed.FS
+
+var midiFileNames = [...]string{
+	"cernyj-kot-sutkin.mid",
+	"demo.mid",
+	"razgovor_v_poezde.mid",
+}
 
 var midiPlaying bool
 
-// PlayMIDI starts MIDI file playback; if already playing, stops it first.
-func PlayMIDI() {
+// PlayMIDI starts playback of the file at the given index; if already playing, stops it first.
+func PlayMIDI(fileIndex byte) {
 	if midiPlaying {
 		StopMIDI()
 		return
 	}
+	if int(fileIndex) >= len(midiFileNames) {
+		println("midi_play: invalid index:", fileIndex)
+		return
+	}
+	name := midiFileNames[fileIndex]
+	data, err := midiFS.ReadFile("mid/" + name)
+	if err != nil {
+		println("midi_play: file not found:", name)
+		return
+	}
 	midiPlaying = true
-	go PlayMIDIFile()
+	go PlayMIDIFile(data)
 }
 
 // StopMIDI halts playback; running tracks exit at the next tick check.
@@ -25,12 +41,12 @@ func StopMIDI() {
 	midiPlaying = false
 }
 
-// PlayMIDIFile parses the embedded MIDI file and sends events into EventChannel.
+// PlayMIDIFile parses the given MIDI data and sends events into EventChannel.
 // Format 0: single track. Format 1: all tracks run concurrently (goroutine per track).
 // Format 2: tracks run sequentially. Tempo meta events on any track affect all tracks.
-func PlayMIDIFile() {
+func PlayMIDIFile(data []byte) {
 	defer func() { midiPlaying = false }()
-	d := midiFile
+	d := data
 	if len(d) < 14 {
 		return
 	}

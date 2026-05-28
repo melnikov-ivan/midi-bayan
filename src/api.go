@@ -150,13 +150,13 @@ func handleStyle(payload []byte) bool {
 	return true
 }
 
-// handlePlay: пуск/стоп воспроизведения MIDI-файла; payload пуст.
+// handlePlay: пуск/стоп воспроизведения MIDI-файла; payload = [fileIndex(1)].
 func handlePlay(payload []byte) bool {
-	if len(payload) != 0 {
+	if len(payload) != 1 {
 		return false
 	}
-	PlayMIDI()
-	println("midi_play toggle, playing=", midiPlaying)
+	PlayMIDI(payload[0])
+	println("midi_play toggle, index=", payload[0], "playing=", midiPlaying)
 	return true
 }
 
