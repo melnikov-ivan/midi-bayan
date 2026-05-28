@@ -38,14 +38,18 @@ func PlayMIDI(fileIndex byte) {
 
 // StopMIDI halts playback; running tracks exit at the next tick check.
 func StopMIDI() {
+	if !midiPlaying {
+		return
+	}
 	midiPlaying = false
+	SendAllNotesOff()
 }
 
 // PlayMIDIFile parses the given MIDI data and sends events into EventChannel.
 // Format 0: single track. Format 1: all tracks run concurrently (goroutine per track).
 // Format 2: tracks run sequentially. Tempo meta events on any track affect all tracks.
 func PlayMIDIFile(data []byte) {
-	defer func() { midiPlaying = false }()
+	defer StopMIDI()
 	d := data
 	if len(d) < 14 {
 		return

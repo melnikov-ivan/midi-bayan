@@ -114,6 +114,13 @@ func SendDelay(channel uint8, value uint8) {
 	sendCC(channel, 94, value)
 }
 
+// SendAllNotesOff отправляет MIDI CC#123 (All Notes Off) на все 16 каналов.
+func SendAllNotesOff() {
+	for ch := uint8(0); ch < 16; ch++ {
+		sendCC(ch, 123, 0)
+	}
+}
+
 // sendCC формирует и отправляет MIDI Control Change по UART, BLE MIDI и USB-MIDI.
 func sendCC(channel, controller, value uint8) {
 	ch := channel & 0x0F
