@@ -107,6 +107,15 @@
 
             <button class="btn-secondary" onclick="showScreen('screenMenu')">← Назад</button>
 
+            <div class="input-group">
+                <label>Файл</label>
+                <select id="midiFileSelect">
+                    <option value="0">cernyj-kot-sutkin</option>
+                    <option value="1">demo</option>
+                    <option value="2">razgovor_v_poezde</option>
+                </select>
+            </div>
+
             <button id="midiPlayBtn" class="btn-primary" onclick="sendPlay()">▶ Пуск</button>
         </div>
 
@@ -325,7 +334,8 @@
 
         async function sendPlay() {
             try {
-                const msg = buildPlayMessage();
+                const fileIndex = parseInt(document.getElementById('midiFileSelect').value, 10);
+                const msg = buildPlayMessage(fileIndex);
                 await BLE.writeValue(msg);
                 midiFilePlaying = !midiFilePlaying;
                 updateMidiPlayButton();
