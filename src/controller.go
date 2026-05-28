@@ -13,7 +13,8 @@ import (
 type KeyEventType uint8
 
 const (
-	NoteOn        KeyEventType = iota // событие клавиши (Channel, Note, Velocity: 100=нажато, 0=отпущено)
+	NoteOn        KeyEventType = iota // событие клавиши (Channel, Note, Velocity: 100=нажато)
+	NoteOff                           // отпускание ноты (Channel, Note)
 	ProgramChange                     // смена инструмента (Channel, Program)
 	Volume                            // громкость канала (Channel, Volume)
 	Reverb                            // глубина реверберации канала (Channel, CCValue)
@@ -22,9 +23,9 @@ const (
 )
 
 type Event struct {
-	Type KeyEventType // NoteOn, ProgramChange, Volume, Reverb, Chorus, Delay
+	Type KeyEventType // NoteOn, NoteOff, ProgramChange, Volume, Reverb, Chorus, Delay
 
-	// NoteOn: клавиатура заполняет из keymap (Velocity: 100=нажато, 0=отпущено)
+	// NoteOn: клавиатура заполняет из keymap (Velocity: 100=нажато; 0=отпущено — тоже NoteOn)
 	Channel  uint8
 	Note     uint8
 	Velocity uint8
@@ -80,12 +81,17 @@ func main() {
 			SendDelay(ev.Channel, ev.CCValue)
 			println("MIDI: Delay ch=", ev.Channel, "value=", ev.CCValue)
 			blink()
+		case NoteOff:
+			SendNoteOff(ev.Channel, ev.Note)
+			println("MIDI: Note Off", ev.Note)
+			blink()
 		case NoteOn:
-			SendNoteOn(ev.Channel, ev.Note, ev.Velocity)
-			if ev.Velocity > 0 {
-				println("MIDI: Note On ", ev.Note)
-			} else {
+			if ev.Velocity == 0 {
+				SendNoteOff(ev.Channel, ev.Note)
 				println("MIDI: Note Off", ev.Note)
+			} else {
+				SendNoteOn(ev.Channel, ev.Note, ev.Velocity)
+				println("MIDI: Note On ", ev.Note)
 			}
 			blink()
 		default:

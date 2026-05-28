@@ -158,15 +158,21 @@ func playTrack(d []byte, pos, end int, ppqn uint32, tempoUs *uint32, startMs int
 			if pos+2 > end {
 				return
 			}
-			EventChannel <- Event{Type: NoteOn, Channel: lastStatus & 0x0F, Note: d[pos], Velocity: 0}
+			EventChannel <- Event{Type: NoteOff, Channel: lastStatus & 0x0F, Note: d[pos]}
 			pos += 2
 
 		case lastStatus&0xF0 == 0x90: // NoteOn
 			if pos+2 > end {
 				return
 			}
-			EventChannel <- Event{Type: NoteOn, Channel: lastStatus & 0x0F, Note: d[pos], Velocity: d[pos+1]}
+			ch := lastStatus & 0x0F
+			note, vel := d[pos], d[pos+1]
 			pos += 2
+			if vel == 0 {
+				EventChannel <- Event{Type: NoteOff, Channel: ch, Note: note}
+			} else {
+				EventChannel <- Event{Type: NoteOn, Channel: ch, Note: note, Velocity: vel}
+			}
 
 		case lastStatus&0xF0 == 0xA0: // Polyphonic Aftertouch
 			pos += 2
