@@ -157,8 +157,6 @@ func StartBLEService() {
 				handleSetAudio(payload)
 			case cmdStyle:
 				handleStyle(payload)
-			case cmdPlay:
-				handlePlay(payload)
 			case cmdRecord:
 				handleRecord(payload)
 			case cmdTempo:

@@ -11,7 +11,6 @@ const (
 	cmdSetAudio   byte = 0x04
 	cmdStyle      byte = 0x05 // стиль / пуск (PWA: экран «Стиль»)
 	cmdTempo      byte = 0x06 // тап по «Темп» в PWA + ответ BPM по BLE
-	cmdPlay       byte = 0x07 // пуск/стоп воспроизведения MIDI-файла
 	cmdRecord     byte = 0x08 // старт/стоп записи MIDI на стороне PWA (события идут через стандартную BLE MIDI характеристику)
 )
 
@@ -148,16 +147,6 @@ func handleStyle(payload []byte) bool {
 	}
 	SetSelectedStyle(style)
 	println("style_set:", style)
-	return true
-}
-
-// handlePlay: пуск/стоп воспроизведения MIDI-файла; payload = [fileIndex(1)].
-func handlePlay(payload []byte) bool {
-	if len(payload) != 1 {
-		return false
-	}
-	PlayMIDI(payload[0])
-	println("midi_play toggle, index=", payload[0], "playing=", midiPlaying)
 	return true
 }
 
