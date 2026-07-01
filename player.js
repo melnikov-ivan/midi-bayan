@@ -21,17 +21,28 @@ function onMidiNotification(bytes) {
 async function toggleRecord() {
     try {
         const msg = buildRecordMessage();
-        await BLE.writeValue(msg);
-        midiRecording = !midiRecording;
         if (midiRecording) {
+            const events = midiRecEvents;
+            midiRecEvents = [];
+            midiRecording = false;
+            updateRecordButton();
+            // Сохранение до await BLE: иначе теряется user gesture для showSaveFilePicker.
+            const savePromise = saveMidiRecording(events);
+            try {
+                await BLE.writeValue(msg);
+                console.log('Отправлено CMD_RECORD (стоп записи), событий:', events.length);
+            } catch (error) {
+                console.error('Ошибка отправки record:', error);
+            }
+            await savePromise;
+        } else {
+            await BLE.writeValue(msg);
+            midiRecording = true;
             midiRecEvents = [];
             midiRecStartTime = performance.now();
+            updateRecordButton();
             console.log('Отправлено CMD_RECORD (старт записи)');
-        } else {
-            console.log('Отправлено CMD_RECORD (стоп записи), событий:', midiRecEvents.length);
-            await saveMidiRecording();
         }
-        updateRecordButton();
     } catch (error) {
         console.error('Ошибка отправки record:', error);
     }
@@ -73,37 +84,42 @@ function buildMidiFileBytes(events) {
     return new Uint8Array([...header, ...trackHeader, ...trackBytes]);
 }
 
-// saveMidiRecording сохраняет запись. На мобильных (в т.ч. установленное PWA в standalone-режиме)
-// клик по <a download> с blob-URL часто ничего не делает — нет UI загрузок браузера, поэтому там
-// в первую очередь используется Web Share API (открывает системное меню «Поделиться» / «Сохранить»).
-// На десктопе Web Share обычно недоступен — используется прямое скачивание через <a download>.
-async function saveMidiRecording() {
-    if (midiRecEvents.length === 0) {
+// saveMidiRecording сохраняет запись. На Android Chrome/PWA (Chrome 132+) — showSaveFilePicker,
+// на десктопе — <a download>, на старых мобильных — openBlobForSave.
+async function saveMidiRecording(events) {
+    if (!events || events.length === 0) {
         console.log('Нет записанных событий, файл не сохранён');
         return;
     }
-    const bytes = buildMidiFileBytes(midiRecEvents);
+    const bytes = buildMidiFileBytes(events);
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `bayan-recording-${ts}.mid`;
     const blob = new Blob([bytes], { type: 'audio/midi' });
+    const midiTypes = [{
+        description: 'MIDI',
+        accept: { 'audio/midi': ['.mid'], 'audio/x-midi': ['.mid', '.midi'] },
+    }];
 
-    if (navigator.share && navigator.canShare) {
-        const file = new File([blob], filename, { type: 'audio/midi' });
-        if (navigator.canShare({ files: [file] })) {
-            try {
-                await navigator.share({ files: [file], title: filename });
+    if (window.showSaveFilePicker) {
+        try {
+            const handle = await window.showSaveFilePicker({ suggestedName: filename, types: midiTypes });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return;
+        } catch (error) {
+            if (error && error.name === 'AbortError') {
+                console.log('Сохранение отменено пользователем');
                 return;
-            } catch (error) {
-                if (error && error.name === 'AbortError') {
-                    console.log('Сохранение отменено пользователем');
-                    return;
-                }
-                console.log('Web Share недоступен, скачиваем напрямую:', error);
             }
+            console.log('showSaveFilePicker недоступен, пробуем другой способ:', error);
         }
     }
 
     downloadBlob(blob, filename);
+    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        openBlobForSave(blob, filename);
+    }
 }
 
 function downloadBlob(blob, filename) {
@@ -115,4 +131,18 @@ function downloadBlob(blob, filename) {
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Запасной путь для старых мобильных браузеров без File System Access API.
+function openBlobForSave(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
