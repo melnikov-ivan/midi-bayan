@@ -149,6 +149,7 @@ label {
 
 input[type="text"],
 input[type="number"],
+input[type="file"],
 select {
     width: 100%;
     padding: 12px;
@@ -399,4 +400,16 @@ input[type="range"]::-moz-range-thumb {
 .style-tempo-line span {
     font-weight: 700;
     color: #333;
+}
+
+.midi-file-name {
+    margin-top: 8px;
+    font-size: 14px;
+    color: #666;
+    word-break: break-all;
+}
+
+input[type="file"] {
+    padding: 10px;
+    cursor: pointer;
 }

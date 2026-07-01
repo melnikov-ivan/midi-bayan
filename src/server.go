@@ -40,9 +40,16 @@ func StartBLEService() {
 			{
 				Handle: &MidiChar,
 				UUID:   midiCharUUID,
+				// Write нужен для регистрации WriteEvent в TinyGo/nRF (gatts_sd.go:
+				// handler вешается только при CharacteristicWritePermission).
+				// WriteWithoutResponse — основной путь от PWA (writeValueWithoutResponse).
 				Flags: bluetooth.CharacteristicReadPermission |
 					bluetooth.CharacteristicWriteWithoutResponsePermission |
+					bluetooth.CharacteristicWritePermission |
 					bluetooth.CharacteristicNotifyPermission,
+				WriteEvent: func(client bluetooth.Connection, offset int, value []byte) {
+					midiInPush(value)
+				},
 			},
 		},
 	}))
@@ -111,6 +118,13 @@ func StartBLEService() {
 	// Бесконечный цикл: парсим входящие сообщения и синхронизируем только при новом значении
 	for {
 		time.Sleep(10 * time.Millisecond)
+		for {
+			data, ok := midiInPop()
+			if !ok {
+				break
+			}
+			handleBleMidiIn(data)
+		}
 		if hasNewValue && charValueLen > 0 {
 			hasNewValue = false
 			msg := charValueBuf[:charValueLen]

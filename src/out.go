@@ -129,3 +129,46 @@ func sendCC(channel, controller, value uint8) {
 	sendMidiBLE(msg)
 	_ = midi.Port().ControlChange(usbMIDICableNr, usbMIDIHostChannel(channel), controller&0x7F, value&0x7F)
 }
+
+// forwardRawMidi пересылает сырое MIDI-сообщение на UART и USB-MIDI (без эха в BLE).
+// Вызывается при приёме MIDI из PWA через BLE MIDI характеристику.
+func forwardRawMidi(data []byte) {
+	midiOutMu.Lock()
+	defer midiOutMu.Unlock()
+	if len(data) == 0 {
+		return
+	}
+	machine.UART0.Write(data)
+	forwardRawMidiUSB(data)
+}
+
+func forwardRawMidiUSB(data []byte) {
+	if len(data) == 0 {
+		return
+	}
+	p := midi.Port()
+	st := data[0]
+	ch := usbMIDIHostChannel(st & 0x0F)
+	switch st & 0xF0 {
+	case 0x80:
+		if len(data) >= 3 {
+			_ = p.NoteOff(usbMIDICableNr, ch, midi.Note(data[1]&0x7F), 0)
+		}
+	case 0x90:
+		if len(data) >= 3 {
+			if data[2] == 0 {
+				_ = p.NoteOff(usbMIDICableNr, ch, midi.Note(data[1]&0x7F), 0)
+			} else {
+				_ = p.NoteOn(usbMIDICableNr, ch, midi.Note(data[1]&0x7F), data[2]&0x7F)
+			}
+		}
+	case 0xB0:
+		if len(data) >= 3 {
+			_ = p.ControlChange(usbMIDICableNr, ch, data[1]&0x7F, data[2]&0x7F)
+		}
+	case 0xC0:
+		if len(data) >= 2 {
+			_ = p.ProgramChange(usbMIDICableNr, ch, data[1]&0x7F)
+		}
+	}
+}
