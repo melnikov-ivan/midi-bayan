@@ -29,7 +29,7 @@ async function toggleRecord() {
             console.log('Отправлено CMD_RECORD (старт записи)');
         } else {
             console.log('Отправлено CMD_RECORD (стоп записи), событий:', midiRecEvents.length);
-            saveMidiRecording();
+            await saveMidiRecording();
         }
         updateRecordButton();
     } catch (error) {
@@ -73,18 +73,44 @@ function buildMidiFileBytes(events) {
     return new Uint8Array([...header, ...trackHeader, ...trackBytes]);
 }
 
-function saveMidiRecording() {
+// saveMidiRecording сохраняет запись. На мобильных (в т.ч. установленное PWA в standalone-режиме)
+// клик по <a download> с blob-URL часто ничего не делает — нет UI загрузок браузера, поэтому там
+// в первую очередь используется Web Share API (открывает системное меню «Поделиться» / «Сохранить»).
+// На десктопе Web Share обычно недоступен — используется прямое скачивание через <a download>.
+async function saveMidiRecording() {
     if (midiRecEvents.length === 0) {
         console.log('Нет записанных событий, файл не сохранён');
         return;
     }
     const bytes = buildMidiFileBytes(midiRecEvents);
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `bayan-recording-${ts}.mid`;
     const blob = new Blob([bytes], { type: 'audio/midi' });
+
+    if (navigator.share && navigator.canShare) {
+        const file = new File([blob], filename, { type: 'audio/midi' });
+        if (navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({ files: [file], title: filename });
+                return;
+            } catch (error) {
+                if (error && error.name === 'AbortError') {
+                    console.log('Сохранение отменено пользователем');
+                    return;
+                }
+                console.log('Web Share недоступен, скачиваем напрямую:', error);
+            }
+        }
+    }
+
+    downloadBlob(blob, filename);
+}
+
+function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const ts = new Date().toISOString().replace(/[:.]/g, '-');
     a.href = url;
-    a.download = `bayan-recording-${ts}.mid`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
