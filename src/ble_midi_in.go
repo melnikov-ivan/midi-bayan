@@ -1,15 +1,15 @@
 package main
 
 const (
-	midiInSlotSize  = 20
-	midiInQueueSize = 32
+	midiInSlotSize  = 24
+	midiInQueueSize = 256
 )
 
 // Очередь входящих BLE MIDI пакетов (WriteEvent → push, main loop → pop).
 var midiInQueue [midiInQueueSize][midiInSlotSize]byte
 var midiInQueueLen [midiInQueueSize]uint8
-var midiInQueueHead uint8
-var midiInQueueTail uint8
+var midiInQueueHead uint16
+var midiInQueueTail uint16
 
 // midiInPush копирует пакет в очередь из контекста BLE WriteEvent (без аллокаций).
 func midiInPush(value []byte) {
@@ -18,7 +18,7 @@ func midiInPush(value []byte) {
 		n = midiInSlotSize
 	}
 	if midiInQueueHead-midiInQueueTail >= midiInQueueSize {
-		return // очередь переполнена
+		return // очередь переполнена — пакет теряется
 	}
 	idx := midiInQueueHead % midiInQueueSize
 	for i := 0; i < n; i++ {
@@ -41,87 +41,47 @@ func midiInPop() ([]byte, bool) {
 
 // handleBleMidiIn разбирает BLE MIDI пакет и пересылает MIDI на UART и USB (без эха в BLE).
 func handleBleMidiIn(data []byte) {
-	println("ble_midi_in: len=", len(data))
-	if len(data) == 0 {
-		return
-	}
 	if len(data) < 2 {
-		println("ble_midi_in: packet too short")
 		return
 	}
 	parseAndForwardBleMidi(data)
 }
 
+// parseAndForwardBleMidi: timestamp → status → data для каждого сообщения в пакете.
 func parseAndForwardBleMidi(data []byte) {
-	if len(data) < 2 {
+	if len(data) < 3 {
 		return
 	}
-	i := 1 // пропуск header (timestamp high)
+	i := 1 // пропуск header
 	for i < len(data) {
-		b := data[i]
-		if b >= 0xF8 { // System Real-Time
-			println("ble_midi_in: sys realtime=", b)
+		if data[i] >= 0xF8 {
 			forwardRawMidi(data[i : i+1])
 			i++
 			continue
 		}
-		if b&0x80 != 0 && b < 0xF0 {
-			i++ // timestamp low
+		if data[i]&0x80 != 0 && data[i] < 0xF0 {
+			i++
 			if i >= len(data) {
-				println("ble_midi_in: truncated after timestamp")
 				return
 			}
-			b = data[i]
 		}
-		if b&0x80 == 0 {
+		if data[i]&0x80 == 0 {
 			i++
 			continue
 		}
-		status := b
+		status := data[i]
 		i++
 		dlen := rawMidiDataLen(status)
-		end := i + dlen
-		if end > len(data) {
-			end = len(data)
+		if dlen == 0 || i+dlen > len(data) {
+			return
 		}
 		var msg [3]byte
-		n := 1 + (end - i)
 		msg[0] = status
-		for j := 0; j < end-i; j++ {
+		for j := 0; j < dlen; j++ {
 			msg[1+j] = data[i+j]
 		}
-		if n > 1 {
-			logBleMidiMessage(msg[:n])
-			forwardRawMidi(msg[:n])
-		}
-		i = end
-	}
-}
-
-func logBleMidiMessage(msg []byte) {
-	switch msg[0] & 0xF0 {
-	case 0x90:
-		if len(msg) >= 3 {
-			if msg[2] == 0 {
-				println("ble_midi_in: Note Off ch=", msg[0]&0x0F, "note=", msg[1])
-			} else {
-				println("ble_midi_in: Note On ch=", msg[0]&0x0F, "note=", msg[1], "vel=", msg[2])
-			}
-		}
-	case 0x80:
-		if len(msg) >= 3 {
-			println("ble_midi_in: Note Off ch=", msg[0]&0x0F, "note=", msg[1])
-		}
-	case 0xB0:
-		if len(msg) >= 3 {
-			println("ble_midi_in: CC ch=", msg[0]&0x0F, "cc=", msg[1], "val=", msg[2])
-		}
-	case 0xC0:
-		if len(msg) >= 2 {
-			println("ble_midi_in: PC ch=", msg[0]&0x0F, "prog=", msg[1])
-		}
-	default:
-		println("ble_midi_in: status=", msg[0], "len=", len(msg))
+		forwardRawMidi(msg[:1+dlen])
+		i += dlen
 	}
 }
 

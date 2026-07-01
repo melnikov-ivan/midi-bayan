@@ -6,6 +6,7 @@ let midiRecStartTime = 0;
 
 let midiFilePlaying = false;
 let midiPlayAbort = false;
+const activeNotes = new Set();
 
 function updateRecordButton() {
     const btn = document.getElementById('recordBtn');
@@ -177,6 +178,7 @@ function readVarLen(bytes, pos) {
 }
 
 // parseSmf разбирает Standard MIDI File и возвращает события с абсолютным временем в мс.
+// Темп map общий для всех треков (format 1): события сливаются по tick, затем tick → ms.
 function parseSmf(bytes) {
     if (bytes.length < 14) throw new Error('файл слишком короткий');
     if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'MThd') {
@@ -200,92 +202,164 @@ function parseSmf(bytes) {
     }
     if (spans.length === 0) throw new Error('нет треков');
 
-    let tempoUs = 500000;
-    const allEvents = [];
-
+    const allTickEvents = [];
+    const allTempos = [];
     for (const span of spans) {
-        let trackPos = span.start;
-        let absoluteMs = 0;
-        let lastStatus = 0;
-
-        while (trackPos < span.end) {
-            const { val: delta, n: dn } = readVarLen(bytes, trackPos);
-            trackPos += dn;
-            if (trackPos >= span.end) break;
-
-            absoluteMs += delta * tempoUs / ppq / 1000;
-
-            if (bytes[trackPos] & 0x80) {
-                lastStatus = bytes[trackPos];
-                trackPos++;
-            }
-            if (trackPos >= span.end || lastStatus === 0) break;
-
-            if (lastStatus === 0xff) {
-                const metaType = bytes[trackPos++];
-                const { val: metaLen, n: mn } = readVarLen(bytes, trackPos);
-                trackPos += mn;
-                if (metaType === 0x2f) break;
-                if (metaType === 0x51 && metaLen === 3 && trackPos + 3 <= span.end) {
-                    tempoUs = (bytes[trackPos] << 16) | (bytes[trackPos + 1] << 8) | bytes[trackPos + 2];
-                }
-                trackPos += metaLen;
-                continue;
-            }
-
-            if (lastStatus >= 0xf0) {
-                const { val: sysexLen, n: sn } = readVarLen(bytes, trackPos);
-                trackPos += sn + sysexLen;
-                lastStatus = 0;
-                continue;
-            }
-
-            const msgType = lastStatus & 0xf0;
-            let dataLen = 0;
-            if (msgType === 0xc0 || msgType === 0xd0) dataLen = 1;
-            else if (msgType >= 0x80 && msgType <= 0xe0) dataLen = 2;
-
-            if (trackPos + dataLen > span.end) break;
-            const message = new Uint8Array(1 + dataLen);
-            message[0] = lastStatus;
-            for (let i = 0; i < dataLen; i++) message[1 + i] = bytes[trackPos + i];
-            trackPos += dataLen;
-
-            if (msgType >= 0x80 && msgType <= 0xe0) {
-                allEvents.push({ timeMs: absoluteMs, message });
-            }
-        }
+        const { events, tempos } = parseSmfTrack(bytes, span);
+        allTickEvents.push(...events);
+        allTempos.push(...tempos);
     }
 
-    allEvents.sort((a, b) => a.timeMs - b.timeMs);
-    return { events: allEvents };
+    const tempoMap = mergeTempoMap(allTempos);
+    const events = allTickEvents.map((ev) => ({
+        timeMs: tickToMs(ev.tick, tempoMap, ppq),
+        message: ev.message
+    }));
+    events.sort((a, b) => a.timeMs - b.timeMs);
+    return { events };
+}
+
+function parseSmfTrack(bytes, span) {
+    const events = [];
+    const tempos = [];
+    let tick = 0;
+    let lastStatus = 0;
+    let trackPos = span.start;
+
+    while (trackPos < span.end) {
+        const { val: delta, n: dn } = readVarLen(bytes, trackPos);
+        trackPos += dn;
+        if (trackPos >= span.end) break;
+
+        tick += delta;
+
+        if (bytes[trackPos] & 0x80) {
+            lastStatus = bytes[trackPos];
+            trackPos++;
+        }
+        if (trackPos >= span.end || lastStatus === 0) break;
+
+        if (lastStatus === 0xff) {
+            const metaType = bytes[trackPos++];
+            const { val: metaLen, n: mn } = readVarLen(bytes, trackPos);
+            trackPos += mn;
+            if (metaType === 0x2f) break;
+            if (metaType === 0x51 && metaLen === 3 && trackPos + 3 <= span.end) {
+                const tempoUs = (bytes[trackPos] << 16) | (bytes[trackPos + 1] << 8) | bytes[trackPos + 2];
+                tempos.push({ tick, tempoUs });
+            }
+            trackPos += metaLen;
+            continue;
+        }
+
+        if (lastStatus >= 0xf0) {
+            const { val: sysexLen, n: sn } = readVarLen(bytes, trackPos);
+            trackPos += sn + sysexLen;
+            lastStatus = 0;
+            continue;
+        }
+
+        const msgType = lastStatus & 0xf0;
+        let dataLen = 0;
+        if (msgType === 0xc0 || msgType === 0xd0) dataLen = 1;
+        else if (msgType >= 0x80 && msgType <= 0xe0) dataLen = 2;
+
+        if (trackPos + dataLen > span.end) break;
+        const message = new Uint8Array(1 + dataLen);
+        message[0] = lastStatus;
+        for (let i = 0; i < dataLen; i++) message[1 + i] = bytes[trackPos + i];
+        trackPos += dataLen;
+
+        if (msgType >= 0x80 && msgType <= 0xe0) {
+            events.push({ tick, message });
+        }
+    }
+    return { events, tempos };
+}
+
+function mergeTempoMap(tempos) {
+    tempos.sort((a, b) => a.tick - b.tick);
+    const map = [{ tick: 0, tempoUs: 500000 }];
+    for (const t of tempos) {
+        if (map[map.length - 1].tick === t.tick) {
+            map[map.length - 1].tempoUs = t.tempoUs;
+        } else {
+            map.push(t);
+        }
+    }
+    return map;
+}
+
+function tickToMs(tick, tempoMap, ppq) {
+    let ms = 0;
+    let prevTick = 0;
+    let tempoUs = tempoMap[0].tempoUs;
+    for (let i = 1; i < tempoMap.length; i++) {
+        const seg = tempoMap[i];
+        if (seg.tick >= tick) break;
+        ms += (seg.tick - prevTick) * tempoUs / ppq / 1000;
+        prevTick = seg.tick;
+        tempoUs = seg.tempoUs;
+    }
+    ms += (tick - prevTick) * tempoUs / ppq / 1000;
+    return ms;
 }
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function sendAllNotesOffBle() {
-    for (let ch = 0; ch < 16; ch++) {
-        try {
-            await BLE.writeMidiWithoutResponse(new Uint8Array([0xb0 | ch, 123, 0]));
-        } catch (error) {
-            console.error('All Notes Off failed, ch=', ch, error);
-        }
+function trackMidiMessage(msg) {
+    const st = msg[0];
+    const ch = st & 0x0f;
+    const cmd = st & 0xf0;
+    const note = msg[1];
+    const key = (ch << 8) | note;
+    if (cmd === 0x90 && msg[2] > 0) {
+        activeNotes.add(key);
+    } else if (cmd === 0x80 || (cmd === 0x90 && msg[2] === 0)) {
+        activeNotes.delete(key);
     }
+}
+
+async function flushActiveNotesBle() {
+    const messages = [];
+    for (const key of activeNotes) {
+        messages.push(new Uint8Array([0x80 | (key >> 8), key & 0xff, 0]));
+    }
+    activeNotes.clear();
+    if (messages.length) {
+        await BLE.writeMidiBatch(messages);
+    }
+    await BLE.writeMidiBatch(Array.from({ length: 16 }, (_, ch) => new Uint8Array([0xb0 | ch, 123, 0])));
+}
+
+async function sendAllNotesOffBle() {
+    await BLE.writeMidiBatch(Array.from({ length: 16 }, (_, ch) => new Uint8Array([0xb0 | ch, 123, 0])));
 }
 
 async function runMidiPlayback(events) {
     const start = performance.now();
-    for (const ev of events) {
+    let i = 0;
+    while (i < events.length) {
         if (midiPlayAbort) return;
-        const elapsed = performance.now() - start;
-        const delay = ev.timeMs - elapsed;
+        const t = events[i].timeMs;
+        const delay = t - (performance.now() - start);
         if (delay > 0) {
             await sleep(delay);
             if (midiPlayAbort) return;
         }
-        await BLE.writeMidiWithoutResponse(ev.message);
+        const batch = [];
+        while (i < events.length && events[i].timeMs === t) {
+            const msg = events[i].message;
+            trackMidiMessage(msg);
+            batch.push(msg);
+            i++;
+        }
+        await BLE.writeMidiBatch(batch);
+    }
+    if (!midiPlayAbort) {
+        await flushActiveNotesBle();
     }
 }
 
@@ -293,7 +367,7 @@ function stopMidiPlayback() {
     midiPlayAbort = true;
     midiFilePlaying = false;
     updateMidiPlayButton();
-    sendAllNotesOffBle();
+    flushActiveNotesBle();
 }
 
 async function toggleMidiPlayback() {
@@ -324,6 +398,8 @@ async function toggleMidiPlayback() {
     }
 
     midiPlayAbort = false;
+    activeNotes.clear();
+    BLE.resetMidiQueue();
     midiFilePlaying = true;
     updateMidiPlayButton();
     console.log('Воспроизведение MIDI, событий:', parsed.events.length);

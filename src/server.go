@@ -117,13 +117,14 @@ func StartBLEService() {
 
 	// Бесконечный цикл: парсим входящие сообщения и синхронизируем только при новом значении
 	for {
-		time.Sleep(10 * time.Millisecond)
+		busy := false
 		for {
 			data, ok := midiInPop()
 			if !ok {
 				break
 			}
 			handleBleMidiIn(data)
+			busy = true
 		}
 		if hasNewValue && charValueLen > 0 {
 			hasNewValue = false
@@ -171,6 +172,9 @@ func StartBLEService() {
 			default:
 				println("unknown command:", cmd)
 			}
+		}
+		if !busy && !hasNewValue {
+			time.Sleep(2 * time.Millisecond)
 		}
 	}
 }

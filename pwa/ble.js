@@ -55,6 +55,8 @@ async function connect(cbs) {
         midiWriteWithoutResponse = midiProps.writeWithoutResponse;
         midiWrite = midiProps.write;
 
+        resetMidiQueue();
+
         midiCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
             const value = event.target.value;
             const buf = value.buffer || value;
@@ -115,33 +117,92 @@ async function writeValue(data) {
     await characteristic.writeValue(buffer);
 }
 
-// writeMidiWithoutResponse отправляет BLE MIDI пакет в стандартную MIDI характеристику.
-// message — сырое MIDI-сообщение (1–3 байта); оборачивается в header + timestamp.
-async function writeMidiWithoutResponse(message) {
-    if (!midiCharacteristic) {
-        throw new Error('MIDI характеристика не найдена');
+let midiWriteChain = Promise.resolve();
+const MIDI_WRITE_GAP_MS = 2;
+const MAX_MSGS_PER_PACKET = 4;
+
+function resetMidiQueue() {
+    midiWriteChain = Promise.resolve();
+}
+
+function sleepMs(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function buildBleMidiPacket(messages) {
+    const ms = Math.floor(performance.now()) % 8192;
+    let size = 1;
+    for (const msg of messages) size += 1 + msg.length;
+    const packet = new Uint8Array(size);
+    packet[0] = 0x80 | (ms >> 7);
+    let off = 1;
+    for (const msg of messages) {
+        packet[off++] = 0x80 | (ms & 0x7f);
+        packet.set(msg, off);
+        off += msg.length;
     }
+    return packet;
+}
+
+function buildSingleBleMidiPacket(message) {
     const raw = message instanceof Uint8Array ? message : new Uint8Array(message);
     const ms = Math.floor(performance.now()) % 8192;
     const packet = new Uint8Array(2 + raw.length);
     packet[0] = 0x80 | (ms >> 7);
     packet[1] = 0x80 | (ms & 0x7f);
     packet.set(raw, 2);
+    return packet;
+}
 
+async function sendBleMidiPacket(packet) {
     if (midiWriteWithoutResponse) {
         try {
             await midiCharacteristic.writeValueWithoutResponse(packet);
             return;
         } catch (error) {
-            if (!midiWrite) throw error;
+            console.warn('writeWithoutResponse failed:', error);
         }
     }
     if (midiWrite) {
         await midiCharacteristic.writeValue(packet);
         return;
     }
-    // запасной путь, если properties не сообщили о возможностях
     await midiCharacteristic.writeValueWithoutResponse(packet);
+}
+
+function enqueueBleMidiWrite(task) {
+    const done = midiWriteChain.then(async () => {
+        await task();
+        await sleepMs(MIDI_WRITE_GAP_MS);
+    });
+    midiWriteChain = done.catch((err) => console.error('BLE MIDI write:', err));
+    return done;
+}
+
+function drainMidiQueue() {
+    return midiWriteChain;
+}
+
+async function writeMidiWithoutResponse(message) {
+    if (!midiCharacteristic) {
+        throw new Error('MIDI характеристика не найдена');
+    }
+    await enqueueBleMidiWrite(async () => {
+        await sendBleMidiPacket(buildSingleBleMidiPacket(message));
+    });
+}
+
+async function writeMidiBatch(messages) {
+    if (!midiCharacteristic || !messages.length) return;
+    for (let i = 0; i < messages.length; i += MAX_MSGS_PER_PACKET) {
+        const chunk = messages.slice(i, i + MAX_MSGS_PER_PACKET);
+        await enqueueBleMidiWrite(async () => {
+            const packet = chunk.length === 1
+                ? buildSingleBleMidiPacket(chunk[0])
+                : buildBleMidiPacket(chunk);
+            await sendBleMidiPacket(packet);
+        });
+    }
 }
 
 window.BLE = {
@@ -149,5 +210,8 @@ window.BLE = {
     disconnect,
     readValue,
     writeValue,
-    writeMidiWithoutResponse
+    writeMidiWithoutResponse,
+    writeMidiBatch,
+    drainMidiQueue,
+    resetMidiQueue
 };
