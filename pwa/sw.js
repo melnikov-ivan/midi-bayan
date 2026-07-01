@@ -1,4 +1,4 @@
-const CACHE = 'midi-bayan-pwa-v3';
+const CACHE = 'midi-bayan-pwa-v4';
 
 const PRECACHE = [
   './index.html',
