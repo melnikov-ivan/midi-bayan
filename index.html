@@ -102,22 +102,20 @@
             </div>
         </div>
 
-        <!-- Экран MIDI-плеера: команда CMD_PLAY (пуск/стоп MIDI-файла) -->
+        <!-- Экран MIDI: выбор файла, воспроизведение через BLE MIDI характеристику -->
         <div id="screenMidi" class="screen screen-hidden">
             <h1>🎵 MIDI</h1>
 
             <button class="btn-secondary" onclick="showScreen('screenMenu')">← Назад</button>
 
             <div class="input-group">
-                <label>Файл</label>
-                <select id="midiFileSelect">
-                    <option value="0">cernyj-kot-sutkin</option>
-                    <option value="1">demo</option>
-                    <option value="2">razgovor_v_poezde</option>
-                </select>
+                <label for="midiFileInput">MIDI-файл</label>
+                <input type="file" id="midiFileInput" accept=".mid,.midi,audio/midi,audio/x-midi"
+                    onchange="updateMidiFileLabel()" />
+                <p id="midiFileName" class="midi-file-name">Файл не выбран</p>
             </div>
 
-            <button id="midiPlayBtn" class="btn-primary" onclick="sendPlay()">▶ Пуск</button>
+            <button id="midiPlayBtn" class="btn-primary" onclick="toggleMidiPlayback()">▶ Пуск</button>
 
             <button id="recordBtn" class="btn-primary" onclick="toggleRecord()">⏺ Запись</button>
         </div>
@@ -205,8 +203,7 @@
                 onDisconnected: () => {
                     stylePlaying = false;
                     updateStylePlayButton();
-                    midiFilePlaying = false;
-                    updateMidiPlayButton();
+                    stopMidiPlayback();
                     midiRecording = false;
                     updateRecordButton();
                     showScreen('screenEntrance');
@@ -331,25 +328,6 @@
         }
 
         let stylePlaying = false;
-        let midiFilePlaying = false;
-
-        function updateMidiPlayButton() {
-            const btn = document.getElementById('midiPlayBtn');
-            if (btn) btn.textContent = midiFilePlaying ? '⏹ Стоп' : '▶ Пуск';
-        }
-
-        async function sendPlay() {
-            try {
-                const fileIndex = parseInt(document.getElementById('midiFileSelect').value, 10);
-                const msg = buildPlayMessage(fileIndex);
-                await BLE.writeValue(msg);
-                midiFilePlaying = !midiFilePlaying;
-                updateMidiPlayButton();
-                console.log(midiFilePlaying ? 'Отправлено CMD_PLAY (пуск)' : 'Отправлено CMD_PLAY (стоп)');
-            } catch (error) {
-                console.error('Ошибка отправки play:', error);
-            }
-        }
 
         function updateStylePlayButton() {
             const btn = document.getElementById('stylePlayBtn');

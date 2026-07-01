@@ -107,9 +107,39 @@ async function writeValue(data) {
     await characteristic.writeValue(buffer);
 }
 
+// writeMidiWithoutResponse отправляет BLE MIDI пакет в стандартную MIDI характеристику.
+// message — сырое MIDI-сообщение (1–3 байта); оборачивается в header + timestamp.
+async function writeMidiWithoutResponse(message) {
+    if (!midiCharacteristic) {
+        throw new Error('MIDI характеристика не найдена');
+    }
+    const raw = message instanceof Uint8Array ? message : new Uint8Array(message);
+    const ms = Math.floor(performance.now()) % 8192;
+    const packet = new Uint8Array(2 + raw.length);
+    packet[0] = 0x80 | (ms >> 7);
+    packet[1] = 0x80 | (ms & 0x7f);
+    packet.set(raw, 2);
+
+    const hex = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ');
+    const props = midiCharacteristic.properties;
+
+    if (props.writeWithoutResponse) {
+        await midiCharacteristic.writeValueWithoutResponse(packet);
+        console.log('BLE MIDI →', hex);
+        return;
+    }
+    if (props.write) {
+        await midiCharacteristic.writeValue(packet);
+        console.log('BLE MIDI (write) →', hex);
+        return;
+    }
+    throw new Error('MIDI характеристика не поддерживает запись');
+}
+
 window.BLE = {
     connect,
     disconnect,
     readValue,
-    writeValue
+    writeValue,
+    writeMidiWithoutResponse
 };
