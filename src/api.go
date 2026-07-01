@@ -12,6 +12,7 @@ const (
 	cmdStyle      byte = 0x05 // стиль / пуск (PWA: экран «Стиль»)
 	cmdTempo      byte = 0x06 // тап по «Темп» в PWA + ответ BPM по BLE
 	cmdPlay       byte = 0x07 // пуск/стоп воспроизведения MIDI-файла
+	cmdRecord     byte = 0x08 // старт/стоп записи MIDI на стороне PWA (события идут через стандартную BLE MIDI характеристику)
 )
 
 // audioBroadcastChannels — каналы, на которые транслируются общие аудио-настройки.
@@ -157,6 +158,18 @@ func handlePlay(payload []byte) bool {
 	}
 	PlayMIDI(payload[0])
 	println("midi_play toggle, index=", payload[0], "playing=", midiPlaying)
+	return true
+}
+
+// handleRecord: переключает состояние записи MIDI (payload пуст). Сами MIDI-события PWA получает
+// как обычно через уведомления стандартной BLE MIDI характеристики (MidiChar) и сохраняет их локально;
+// прошивка лишь отслеживает состояние для лога.
+func handleRecord(payload []byte) bool {
+	if len(payload) != 0 {
+		return false
+	}
+	recording := ToggleRecording()
+	println("record toggle, recording=", recording)
 	return true
 }
 

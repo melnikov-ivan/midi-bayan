@@ -1,10 +1,15 @@
 const SERVICE_UUID = '12345678-1234-5678-1234-567890abcdef';
 const CHARACTERISTIC_UUID = 'fedcba09-8765-4321-8765-432110325476';
 
+const MIDI_SERVICE_UUID = '03b80e5a-ede8-4b33-a751-6ce34ec4c700';
+const MIDI_CHARACTERISTIC_UUID = '7772e5db-3868-4112-a1a9-f2669d106bf3';
+
 let device = null;
 let server = null;
 let service = null;
 let characteristic = null;
+let midiService = null;
+let midiCharacteristic = null;
 let callbacks = null;
 
 async function connect(cbs) {
@@ -12,6 +17,7 @@ async function connect(cbs) {
     const onConnected = () => (callbacks.onConnected && callbacks.onConnected());
     const onDisconnected = () => (callbacks.onDisconnected && callbacks.onDisconnected());
     const onValue = (bytes) => (callbacks.onValue && callbacks.onValue(bytes));
+    const onMidiValue = (bytes) => (callbacks.onMidiValue && callbacks.onMidiValue(bytes));
 
     try {
         if (!navigator.bluetooth) {
@@ -19,7 +25,7 @@ async function connect(cbs) {
         }
 
         device = await navigator.bluetooth.requestDevice({
-            filters: [{ services: ['03b80e5a-ede8-4b33-a751-6ce34ec4c700'] }],
+            filters: [{ services: [MIDI_SERVICE_UUID] }],
             optionalServices: [SERVICE_UUID]
         });
 
@@ -40,6 +46,17 @@ async function connect(cbs) {
         });
         await characteristic.startNotifications();
 
+        midiService = await server.getPrimaryService(MIDI_SERVICE_UUID);
+        midiCharacteristic = await midiService.getCharacteristic(MIDI_CHARACTERISTIC_UUID);
+
+        midiCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
+            const value = event.target.value;
+            const buf = value.buffer || value;
+            const bytes = new Uint8Array(buf, value.byteOffset || 0, value.byteLength || buf.byteLength);
+            onMidiValue(bytes);
+        });
+        await midiCharacteristic.startNotifications();
+
         onConnected();
         return true;
     } catch (error) {
@@ -59,6 +76,8 @@ function clearState() {
     server = null;
     service = null;
     characteristic = null;
+    midiService = null;
+    midiCharacteristic = null;
 }
 
 function disconnect() {

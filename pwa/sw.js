@@ -1,9 +1,10 @@
-const CACHE = 'midi-bayan-pwa-v2';
+const CACHE = 'midi-bayan-pwa-v3';
 
 const PRECACHE = [
   './index.html',
   './api.js',
   './ble.js',
+  './player.js',
   './styles.css',
   './manifest.json',
   './icon.svg',

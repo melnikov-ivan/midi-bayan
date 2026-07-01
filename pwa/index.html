@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="styles.css">
     <script src="api.js"></script>
     <script src="ble.js"></script>
+    <script src="player.js"></script>
 </head>
 <body>
     <div class="container">
@@ -117,6 +118,8 @@
             </div>
 
             <button id="midiPlayBtn" class="btn-primary" onclick="sendPlay()">▶ Пуск</button>
+
+            <button id="recordBtn" class="btn-primary" onclick="toggleRecord()">⏺ Запись</button>
         </div>
 
         <!-- Экран стиля: команда CMD_STYLE (пуск) -->
@@ -204,9 +207,12 @@
                     updateStylePlayButton();
                     midiFilePlaying = false;
                     updateMidiPlayButton();
+                    midiRecording = false;
+                    updateRecordButton();
                     showScreen('screenEntrance');
                 },
-                onValue: processCharacteristicValue
+                onValue: processCharacteristicValue,
+                onMidiValue: onMidiNotification
             });
         }
 
