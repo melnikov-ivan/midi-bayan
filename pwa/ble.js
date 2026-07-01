@@ -10,6 +10,8 @@ let service = null;
 let characteristic = null;
 let midiService = null;
 let midiCharacteristic = null;
+let midiWriteWithoutResponse = false;
+let midiWrite = false;
 let callbacks = null;
 
 async function connect(cbs) {
@@ -49,6 +51,10 @@ async function connect(cbs) {
         midiService = await server.getPrimaryService(MIDI_SERVICE_UUID);
         midiCharacteristic = await midiService.getCharacteristic(MIDI_CHARACTERISTIC_UUID);
 
+        const midiProps = midiCharacteristic.properties;
+        midiWriteWithoutResponse = midiProps.writeWithoutResponse;
+        midiWrite = midiProps.write;
+
         midiCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
             const value = event.target.value;
             const buf = value.buffer || value;
@@ -78,6 +84,8 @@ function clearState() {
     characteristic = null;
     midiService = null;
     midiCharacteristic = null;
+    midiWriteWithoutResponse = false;
+    midiWrite = false;
 }
 
 function disconnect() {
@@ -120,20 +128,20 @@ async function writeMidiWithoutResponse(message) {
     packet[1] = 0x80 | (ms & 0x7f);
     packet.set(raw, 2);
 
-    const hex = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ');
-    const props = midiCharacteristic.properties;
-
-    if (props.writeWithoutResponse) {
-        await midiCharacteristic.writeValueWithoutResponse(packet);
-        console.log('BLE MIDI →', hex);
-        return;
+    if (midiWriteWithoutResponse) {
+        try {
+            await midiCharacteristic.writeValueWithoutResponse(packet);
+            return;
+        } catch (error) {
+            if (!midiWrite) throw error;
+        }
     }
-    if (props.write) {
+    if (midiWrite) {
         await midiCharacteristic.writeValue(packet);
-        console.log('BLE MIDI (write) →', hex);
         return;
     }
-    throw new Error('MIDI характеристика не поддерживает запись');
+    // запасной путь, если properties не сообщили о возможностях
+    await midiCharacteristic.writeValueWithoutResponse(packet);
 }
 
 window.BLE = {
