@@ -5,6 +5,7 @@ const CMD_SET_AUDIO = 0x04;
 const CMD_STYLE = 0x05;
 const CMD_TEMPO = 0x06;
 const CMD_PLAY  = 0x07;
+const CMD_RECORD = 0x08;
 
 function crc8(data) {
     let crc = 0;
@@ -105,6 +106,16 @@ function buildGetTempoMessage() {
     const payloadLen = 0;
     const msg = new Uint8Array(1 + 2 + payloadLen + 1);
     msg[0] = CMD_TEMPO;
+    msg[1] = payloadLen & 0xff;
+    msg[2] = (payloadLen >> 8) & 0xff;
+    msg[3 + payloadLen] = crc8(msg.subarray(0, 3 + payloadLen));
+    return msg;
+}
+
+function buildRecordMessage() {
+    const payloadLen = 0;
+    const msg = new Uint8Array(1 + 2 + payloadLen + 1);
+    msg[0] = CMD_RECORD;
     msg[1] = payloadLen & 0xff;
     msg[2] = (payloadLen >> 8) & 0xff;
     msg[3 + payloadLen] = crc8(msg.subarray(0, 3 + payloadLen));
